@@ -30,7 +30,7 @@ syncdev:
 
 bsync: build sync
 
-dev: update-submodule-dev build syncdev
+dev: update-submodule-dev build
 
 stg: update-submodule-stg build
 
