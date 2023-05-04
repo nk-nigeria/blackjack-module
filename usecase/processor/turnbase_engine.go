@@ -72,13 +72,7 @@ func (m *TurnBaseEngine) Loop() *TurnInfo {
 	// next phase (player) by timeout
 	if diff := m.GetRemainCountDown(); diff < 0 {
 		prevUID := m.players[m.curPlayer]
-		if !m.NextPhase() {
-			if m.IsGlob() {
-				m.NextRound()
-			} else {
-				m.NextPlayer()
-			}
-		}
+		m.NextPhase()
 		isNewRound, isNewTurn, isNewPhase := m.isNewRound, m.isNewTurn, m.isNewPhase
 		return &TurnInfo{
 			userId:            m.players[m.curPlayer],
@@ -139,7 +133,12 @@ func (m *TurnBaseEngine) NextPhase() bool {
 		m.SetCountDown()
 		return true
 	} else {
-		return false
+		if m.IsGlob() {
+			m.NextRound()
+		} else {
+			m.NextPlayer()
+		}
+		return true
 	}
 }
 

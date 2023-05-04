@@ -30,7 +30,50 @@ func (m *Engine) Deal(amount int) []*pb.Card {
 }
 
 func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.OpCodeUpdate]proto.Message {
-	return nil
+	messages := make(map[pb.OpCodeUpdate]proto.Message)
+	if s.GetGameState() == pb.GameState_GameStatePlay {
+		hands := []*pb.BlackjackPlayerHand{}
+		dealerHand := &pb.BlackjackPlayerHand{
+			UserId: "",
+			First: &pb.BlackjackHand{
+				Cards: []*pb.Card{
+					s.GetDealerHand().First.Cards[0],
+					{Rank: pb.CardRank_RANK_UNSPECIFIED, Suit: pb.CardSuit_SUIT_UNSPECIFIED},
+				},
+			},
+		}
+		hands = append(hands, dealerHand)
+		for _, presence := range s.GetPlayingPresences() {
+			hands = append(hands, s.GetPlayerHand(presence.GetUserId()))
+		}
+		messages[pb.OpCodeUpdate_OPCODE_UPDATE_DEAL] = &pb.BlackjackUpdateDeal{
+			AllPlayerHand: hands,
+			IsBanker:      false,
+		}
+
+		if s.GetCurrentTurn() == userId {
+			messages[pb.OpCodeUpdate_OPCODE_UPDATE_TABLE] = &pb.BlackjackUpdateDesk{
+				InTurn:              s.GetCurrentTurn(),
+				Hand_N0:             s.GetCurrentHandN0(),
+				IsUpdateLegalAction: true,
+				Actions: &pb.BlackjackLegalActions{
+					UserId:  s.GetCurrentTurn(),
+					Actions: s.GetLegalActions(),
+				},
+			}
+		} else {
+			messages[pb.OpCodeUpdate_OPCODE_UPDATE_TABLE] = &pb.BlackjackUpdateDesk{
+				InTurn:              s.GetCurrentTurn(),
+				Hand_N0:             s.GetCurrentHandN0(),
+				IsUpdateLegalAction: false,
+				Actions:             nil,
+			}
+		}
+	}
+	if s.GetGameState() == pb.GameState_GameStateReward {
+		messages[pb.OpCodeUpdate_OPCODE_UPDATE_WALLET] = s.GetBalanceResult()
+	}
+	return messages
 }
 
 func (m *Engine) Finish(s *entity.MatchState) *pb.BlackjackUpdateFinish {

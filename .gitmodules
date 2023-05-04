@@ -1,4 +1,4 @@
 [submodule "cgp-common"]
 	path = cgp-common
-	url = https://github.com/ciaolink-game-platform/cgp-common.git
+	url = https://github.com/ciaolink-game-platform/cgp-common
 	branch = develop

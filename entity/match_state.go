@@ -1,8 +1,11 @@
 package entity
 
 import (
+	"fmt"
+
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 	"github.com/emirpasic/gods/maps/linkedhashmap"
+	"github.com/heroiclabs/nakama-common/runtime"
 )
 
 const (
@@ -27,6 +30,7 @@ type MatchState struct {
 	currentHand    pb.BlackjackHandN0
 	gameState      pb.GameState
 	updateFinish   *pb.BlackjackUpdateFinish
+	isGameEnded    bool
 }
 
 func NewMatchState(label *MatchLabel) MatchState {
@@ -49,13 +53,17 @@ func NewMatchState(label *MatchLabel) MatchState {
 		currentHand:  pb.BlackjackHandN0_BLACKJACK_HAND_1ST,
 		gameState:    pb.GameState_GameStateIdle,
 		updateFinish: nil,
+		isGameEnded:  false,
+	}
+}
+
+func (s *MatchState) InitUserBet() {
+	for k := range s.userBets {
+		delete(s.userBets, k)
 	}
 }
 
 func (s *MatchState) Init() {
-	for k := range s.userBets {
-		delete(s.userBets, k)
-	}
 	for k := range s.userHands {
 		delete(s.userHands, k)
 	}
@@ -66,6 +74,7 @@ func (s *MatchState) Init() {
 	s.currentTurn = ""
 	s.updateFinish = nil
 	s.currentHand = pb.BlackjackHandN0_BLACKJACK_HAND_1ST
+	s.isGameEnded = false
 }
 
 func (s *MatchState) InitVisited() {
@@ -100,6 +109,9 @@ func (s *MatchState) GetCurrentTurn() string  { return s.currentTurn }
 
 func (s *MatchState) GetGameState() pb.GameState  { return s.gameState }
 func (s *MatchState) SetGameState(v pb.GameState) { s.gameState = v }
+
+func (s *MatchState) SetIsGameEnded(v bool) { s.isGameEnded = v }
+func (s *MatchState) IsGameEnded() bool     { return s.isGameEnded }
 
 func (s *MatchState) GetPlayerHand(userId string) *pb.BlackjackPlayerHand {
 	return s.userHands[userId].ToPb()
@@ -144,12 +156,18 @@ func (s *MatchState) SetUpdateFinish(v *pb.BlackjackUpdateFinish) { s.updateFini
 func (s *MatchState) GetUpdateFinish() *pb.BlackjackUpdateFinish  { return s.updateFinish }
 
 func (s *MatchState) GetUserBetById(userId string) *pb.BlackjackPlayerBet { return s.userBets[userId] }
+func (s *MatchState) SetUserBetById(userId string, bet *pb.BlackjackPlayerBet) {
+	s.userBets[userId] = bet
+}
 
 func (s *MatchState) IsCanBet(userId string, balance int64, bet *pb.BlackjackBet) bool {
-	if bet.Chips+s.userBets[userId].First+s.userBets[userId].Insurance+s.userBets[userId].Second > int64(MaxBetAllowed*s.Label.Bet) {
-		return false
+	fmt.Printf("[LABEL.BET] = %v", s.Label.Bet)
+	if _, found := s.userBets[userId]; !found {
+		return bet.Chips <= balance
+		// && bet.Chips <= int64(MaxBetAllowed*s.Label.Bet)
 	}
 	if balance < bet.Chips {
+		// || bet.Chips+s.userBets[userId].First+s.userBets[userId].Insurance+s.userBets[userId].Second > int64(MaxBetAllowed*s.Label.Bet)
 		return false
 	}
 	return true
@@ -272,6 +290,35 @@ func (s *MatchState) IsBet(userId string) bool {
 	return false
 }
 
+// override
+func (s *MatchState) IsReadyToPlay() bool {
+	if s.Presences.Size() < s.MinPresences {
+		return false
+	}
+	for _, presence := range s.GetPresences() {
+		if s.IsBet(presence.GetUserId()) {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *MatchState) IsEnoughPlayer() bool {
+	return s.Presences.Size() >= s.MinPresences
+}
+
+// override
+func (s *MatchState) SetupMatchPresence() {
+	s.PlayingPresences = linkedhashmap.New()
+	p := make([]runtime.Presence, 0, s.GetPresenceSize())
+	s.Presences.Each(func(key, value interface{}) {
+		if s.IsBet(key.(string)) {
+			p = append(p, value.(runtime.Presence))
+		}
+	})
+	s.AddPlayingPresences(p...)
+}
+
 func (s *MatchState) CalcGameFinish() *pb.BlackjackUpdateFinish {
 	result := &pb.BlackjackUpdateFinish{
 		BetResults: make([]*pb.BlackjackPLayerBetResult, 0),
@@ -368,8 +415,4 @@ func (s *MatchState) DealerPotentialBlackjack() bool {
 
 func (s *MatchState) IsDealerMustDraw() bool {
 	return s.dealerHand.DealerMustDraw()
-}
-
-func (s *MatchState) IsGameEnded() bool {
-	return s.updateFinish != nil
 }

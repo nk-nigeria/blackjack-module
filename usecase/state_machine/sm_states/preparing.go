@@ -21,6 +21,8 @@ func NewStatePreparing(fn FireFn) StateHandler {
 func (s *StatePreparing) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	state := procPkg.GetState()
+	state.SetAllowBet(true)
+	state.InitUserBet()
 	procPkg.GetLogger().Info("state %v", state.Presences)
 	state.SetUpCountDown(preparingTimeout)
 	// remove all user not interact 2 game conti
@@ -71,6 +73,7 @@ func (s *StatePreparing) Process(ctx context.Context, args ...interface{}) error
 			message, procPkg.GetState())
 	}
 	if remain <= 0 {
+		state.SetAllowBet(false)
 		if state.IsReadyToPlay() {
 			s.Trigger(ctx, TriggerStateFinishSuccess)
 		} else {

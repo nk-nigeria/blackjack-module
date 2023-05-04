@@ -42,10 +42,8 @@ func (p *Processor) ProcessNewGame(
 	listPlayerId := make([]string, 0)
 	// deal
 	for _, presence := range s.GetPlayingPresences() {
-		if s.IsBet(presence.GetUserId()) {
-			listPlayerId = append(listPlayerId, presence.GetUserId())
-			s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-		}
+		listPlayerId = append(listPlayerId, presence.GetUserId())
+		s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	}
 	s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	p.notifyInitialDealCard(
@@ -57,16 +55,6 @@ func (p *Processor) ProcessNewGame(
 	p.turnBaseEngine.Config(
 		listPlayerId,
 		[]*Round{
-			{
-				code:   "bet",
-				isGlob: true,
-				phases: []*Phase{
-					{
-						code:     "main",
-						duration: time.Second * 10,
-					},
-				},
-			},
 			{
 				code:   "insurance",
 				isGlob: true,
@@ -101,6 +89,15 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 ) {
+
+	p.revealDealerHiddenCard(ctx, nk, logger, dispatcher, s)
+	for s.IsDealerMustDraw() {
+		cards := p.engine.Deal(1)
+		s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+		p.notifyDealCard(ctx, nk, logger, dispatcher, s, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	}
+	s.SetUpdateFinish(s.CalcGameFinish())
+
 	updateFinish := s.GetUpdateFinish()
 	balanceResult := p.calcRewardForUserPlaying(
 		ctx, nk, logger, db, dispatcher, s, updateFinish,
@@ -130,10 +127,6 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 	}
 	if turnInfo.isNewRound {
 		switch turnInfo.roundCode {
-		case "bet":
-			s.SetAllowBet(true)
-			s.SetAllowInsurance(false)
-			s.SetAllowAction(false)
 		case "insurance":
 			s.SetAllowBet(false)
 			s.SetAllowAction(false)
@@ -142,7 +135,7 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 				p.broadcastMessage(
 					logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 					&pb.BlackjackUpdateDesk{
-						IsInsuranceTurn: true,
+						IsInsuranceTurnEnter: true,
 					}, nil, nil, true,
 				)
 			} else {
@@ -150,9 +143,32 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 				return
 			}
 		case "playing":
-			if s.GetDealerHand().First.Type == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK {
-				s.SetUpdateFinish(s.CalcGameFinish())
-				return
+			if s.DealerPotentialBlackjack() {
+				if s.GetDealerHand().First.Type == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK {
+					s.SetIsGameEnded(true)
+					return
+				} else {
+					p.broadcastMessage(
+						logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
+						&pb.BlackjackUpdateDesk{
+							IsBankerNotBlackjack: true,
+						}, nil, nil, true,
+					)
+					for _, presence := range s.GetPlayingPresences() {
+						bet := s.GetUserBetById(presence.GetUserId())
+						if bet.Insurance > 0 {
+							bet.Insurance = 0
+							s.SetUserBetById(presence.GetUserId(), bet)
+							p.broadcastMessage(
+								logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
+								&pb.BlackjackUpdateDesk{
+									IsUpdateBet: true,
+									Bet:         bet,
+								}, nil, nil, true,
+							)
+						}
+					}
+				}
 			}
 			s.InitVisited()
 			s.SetAllowBet(false)
@@ -162,17 +178,11 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 	}
 	if turnInfo.isNewTurn && turnInfo.roundCode == "playing" {
 		if s.IsAllVisited() {
-			if s.IsDealerMustDraw() {
-				cards := p.engine.Deal(1)
-				s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-				p.notifyDealCard(ctx, nk, logger, dispatcher, s, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-			} else {
-				s.SetUpdateFinish(s.CalcGameFinish())
-				return
-			}
+			s.SetIsGameEnded(true)
+			return
 		}
 	}
-	if turnInfo.isNewPhase {
+	if turnInfo.isNewPhase && turnInfo.roundCode == "playing" {
 		s.SetVisited(turnInfo.userId)
 		s.SetCurrentTurn(turnInfo.userId)
 		s.SetUpCountDown(time.Duration(turnInfo.countDown * 1e9))
@@ -211,6 +221,7 @@ func (p *Processor) ProcessMessageFromUser(
 				logger.Error("error.read-user-wallet")
 				continue
 			}
+			s.ResetUserNotInteract(bet.UserId)
 			switch bet.Code {
 			case pb.BlackjackBetCode_BLACKJACK_BET_DOUBLE:
 				if s.IsCanDoubleBet(bet.UserId, wallet.Chips) {
@@ -261,7 +272,7 @@ func (p *Processor) ProcessMessageFromUser(
 								UserId:                   action.UserId,
 								HandN0:                   s.GetCurrentHandN0(),
 								NewCards:                 cards,
-								Hand:                     s.GetPlayerPartOfHand(action.UserId, s.GetCurrentHandN0()),
+								Hand:                     s.GetPlayerHand(action.UserId),
 							}, nil, nil, true,
 						)
 						if s.GetCurrentHandN0() == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
@@ -283,7 +294,7 @@ func (p *Processor) ProcessMessageFromUser(
 								UserId:                   action.UserId,
 								HandN0:                   s.GetCurrentHandN0(),
 								NewCards:                 cards,
-								Hand:                     s.GetPlayerPartOfHand(action.UserId, s.GetCurrentHandN0()),
+								Hand:                     s.GetPlayerHand(action.UserId),
 							}, nil, nil, true,
 						)
 						// after that hit, player can't hit anymore -> next hand if possible else next turn
@@ -307,8 +318,10 @@ func (p *Processor) ProcessMessageFromUser(
 					if s.IsAllowAction() && s.GetCurrentHandN0() == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
 						s.SetCurrentHandN0(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 						p.turnBaseEngine.RePhase()
+						logger.Info("SWITCH TO 2ND HAND, ACTION_STAY")
 					} else {
 						p.turnBaseEngine.NextPhase()
+						logger.Info("SWITCH TO NEXT PHASE, ACTION_STAY")
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT:
 					if s.IsAllowAction() && s.IsCanSplitHand(action.UserId, wallet.Chips) {
@@ -334,9 +347,9 @@ func (p *Processor) ProcessMessageFromUser(
 			p.broadcastMessage(
 				logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 				&pb.BlackjackUpdateDesk{
-					IsNewTurn:       false,
-					IsInsuranceTurn: s.IsAllowInsurance(),
-					InTurn:          s.GetCurrentTurn(),
+					IsNewTurn:            false,
+					IsInsuranceTurnEnter: s.IsAllowInsurance(),
+					InTurn:               s.GetCurrentTurn(),
 				}, []runtime.Presence{s.GetPresence(message.GetUserId())}, nil, true,
 			)
 		}
@@ -357,13 +370,13 @@ func (p *Processor) notifyUpdateTurn(
 		Actions: s.GetLegalActions(),
 	}
 	msg := &pb.BlackjackUpdateDesk{
-		IsInsuranceTurn: false,
-		IsNewTurn:       true,
-		InTurn:          s.GetCurrentTurn(),
-		Hand_N0:         s.GetCurrentHandN0(),
-		IsUpdateBet:     false,
-		Actions:         nil,
-		IsSplitHand:     false,
+		IsInsuranceTurnEnter: false,
+		IsNewTurn:            true,
+		InTurn:               s.GetCurrentTurn(),
+		Hand_N0:              s.GetCurrentHandN0(),
+		IsUpdateBet:          false,
+		Actions:              nil,
+		IsSplitHand:          false,
 	}
 	for _, presence := range s.GetPresences() {
 		if presence.GetUserId() == s.GetCurrentTurn() {
@@ -388,25 +401,26 @@ func (p *Processor) notifyUpdateBet(
 	chip int64,
 	pos pb.BlackjackHandN0,
 ) {
-	bet := &pb.BlackjackPlayerBet{
-		UserId: userId,
-	}
-	if pos == pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED {
-		bet.Insurance = chip
-	} else if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
-		bet.First = chip
-	} else {
-		bet.Second = chip
-	}
+	// bet := &pb.BlackjackPlayerBet{
+	// 	UserId: userId,
+	// }
+	// if pos == pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED {
+	// 	bet.Insurance = chip
+	// } else if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
+	// 	bet.First = chip
+	// } else {
+	// 	bet.Second = chip
+	// }
+	bet := s.GetUserBetById(userId)
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 		&pb.BlackjackUpdateDesk{
-			IsInsuranceTurn:     false,
-			IsNewTurn:           false,
-			IsUpdateBet:         true,
-			IsUpdateLegalAction: false,
-			IsSplitHand:         false,
-			Bet:                 bet,
+			IsInsuranceTurnEnter: false,
+			IsNewTurn:            false,
+			IsUpdateBet:          true,
+			IsUpdateLegalAction:  false,
+			IsSplitHand:          false,
+			Bet:                  bet,
 		},
 		nil, nil, true,
 	)
@@ -535,19 +549,17 @@ func (p *Processor) notifyInitialDealCard(
 	s *entity.MatchState,
 ) error {
 	for _, presence := range s.GetPlayingPresences() {
-		if s.IsBet(presence.GetUserId()) {
-			p.broadcastMessage(
-				logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
-				&pb.BlackjackUpdateDeal{
-					IsBanker:                 false,
-					IsRevealBankerHiddenCard: false,
-					UserId:                   presence.GetUserId(),
-					NewCards:                 s.GetPlayerHand(presence.GetUserId()).First.Cards,
-					Hand:                     s.GetPlayerHand(presence.GetUserId()).First,
-					HandN0:                   pb.BlackjackHandN0_BLACKJACK_HAND_1ST,
-				}, nil, nil, true,
-			)
-		}
+		p.broadcastMessage(
+			logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
+			&pb.BlackjackUpdateDeal{
+				IsBanker:                 false,
+				IsRevealBankerHiddenCard: false,
+				UserId:                   presence.GetUserId(),
+				NewCards:                 s.GetPlayerHand(presence.GetUserId()).First.Cards,
+				Hand:                     s.GetPlayerHand(presence.GetUserId()),
+				HandN0:                   pb.BlackjackHandN0_BLACKJACK_HAND_1ST,
+			}, nil, nil, true,
+		)
 	}
 	dealerCards := []*pb.Card{
 		s.GetDealerHand().First.GetCards()[0],
@@ -564,12 +576,34 @@ func (p *Processor) notifyInitialDealCard(
 			UserId:                   "",
 			NewCards:                 dealerCards,
 			HandN0:                   pb.BlackjackHandN0_BLACKJACK_HAND_1ST,
-			Hand: &pb.BlackjackHand{
-				Cards: dealerCards,
+			Hand: &pb.BlackjackPlayerHand{
+				First: &pb.BlackjackHand{
+					Cards: dealerCards,
+				},
 			},
 		}, nil, nil, true,
 	)
 	return nil
+}
+
+func (p *Processor) revealDealerHiddenCard(
+	ctx context.Context,
+	nk runtime.NakamaModule,
+	logger runtime.Logger,
+	dispatcher runtime.MatchDispatcher,
+	s *entity.MatchState,
+) {
+	p.broadcastMessage(
+		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
+		&pb.BlackjackUpdateDeal{
+			IsBanker:                 true,
+			IsRevealBankerHiddenCard: true,
+			UserId:                   "",
+			NewCards:                 []*pb.Card{s.GetDealerHand().First.Cards[1]},
+			HandN0:                   pb.BlackjackHandN0_BLACKJACK_HAND_1ST,
+			Hand:                     s.GetDealerHand(),
+		}, nil, nil, true,
+	)
 }
 
 func (p *Processor) notifyDealCard(
@@ -596,13 +630,14 @@ func (p *Processor) notifyDealCard(
 		hand = hands.Second
 	}
 	msg := &pb.BlackjackUpdateDeal{
+		UserId:                   userId,
 		IsBanker:                 isBanker,
 		IsRevealBankerHiddenCard: false,
 		HandN0:                   handN0,
 		NewCards: []*pb.Card{
 			hand.Cards[len(hand.Cards)-1],
 		},
-		Hand: hand,
+		Hand: hands,
 	}
 	return p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
