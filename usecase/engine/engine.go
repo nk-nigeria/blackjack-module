@@ -53,20 +53,23 @@ func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.O
 
 		if s.GetCurrentTurn() == userId {
 			messages[pb.OpCodeUpdate_OPCODE_UPDATE_TABLE] = &pb.BlackjackUpdateDesk{
-				InTurn:              s.GetCurrentTurn(),
-				Hand_N0:             s.GetCurrentHandN0(),
-				IsUpdateLegalAction: true,
+				IsInsuranceTurnEnter: s.IsAllowInsurance(),
+				InTurn:               s.GetCurrentTurn(),
+				Hand_N0:              s.GetCurrentHandN0(),
+				IsUpdateLegalAction:  true,
 				Actions: &pb.BlackjackLegalActions{
 					UserId:  s.GetCurrentTurn(),
 					Actions: s.GetLegalActions(),
 				},
+				PlayersBet: s.GetPlayersBet(),
 			}
 		} else {
 			messages[pb.OpCodeUpdate_OPCODE_UPDATE_TABLE] = &pb.BlackjackUpdateDesk{
-				InTurn:              s.GetCurrentTurn(),
-				Hand_N0:             s.GetCurrentHandN0(),
-				IsUpdateLegalAction: false,
-				Actions:             nil,
+				IsInsuranceTurnEnter: s.IsAllowInsurance(),
+				InTurn:               s.GetCurrentTurn(),
+				Hand_N0:              s.GetCurrentHandN0(),
+				IsUpdateLegalAction:  false,
+				Actions:              nil,
 			}
 		}
 	}

@@ -230,6 +230,14 @@ func (s *MatchState) SplitHand(userId string) int64 {
 }
 
 func (s *MatchState) Rebet(userId string) int64 {
+	if _, found := s.userBets[userId]; !found {
+		s.userBets[userId] = &pb.BlackjackPlayerBet{
+			UserId:    userId,
+			Insurance: 0,
+			First:     0,
+			Second:    0,
+		}
+	}
 	s.userBets[userId].First = s.userLastBets[userId]
 	return s.userLastBets[userId]
 }
@@ -415,4 +423,17 @@ func (s *MatchState) DealerPotentialBlackjack() bool {
 
 func (s *MatchState) IsDealerMustDraw() bool {
 	return s.dealerHand.DealerMustDraw()
+}
+
+func (s *MatchState) GetPlayersBet() []*pb.BlackjackPlayerBet {
+	res := make([]*pb.BlackjackPlayerBet, 0)
+	for k, v := range s.userBets {
+		res = append(res, &pb.BlackjackPlayerBet{
+			UserId:    k,
+			Insurance: v.Insurance,
+			First:     v.First,
+			Second:    v.Second,
+		})
+	}
+	return res
 }
