@@ -99,7 +99,7 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 	s.SetUpdateFinish(s.CalcGameFinish())
 
 	updateFinish := s.GetUpdateFinish()
-	balanceResult := p.calcRewardForUserPlaying(
+	balanceResult, totalFee := p.calcRewardForUserPlaying(
 		ctx, nk, logger, db, dispatcher, s, updateFinish,
 	)
 	s.SetBalanceResult(balanceResult)
@@ -112,6 +112,7 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_WALLET),
 		balanceResult, nil, nil, true,
 	)
+	p.report(logger, balanceResult, totalFee, s)
 }
 
 func (p *Processor) ProcessTurnbase(ctx context.Context,
@@ -479,7 +480,7 @@ func (p *Processor) calcRewardForUserPlaying(
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 	updateFinish *pb.BlackjackUpdateFinish,
-) *pb.BalanceResult {
+) (*pb.BalanceResult, int64) {
 	listUserPlaying := s.GetPlayingPresences()
 	listUserId := make([]string, 0)
 	mapUserIdCalcReward := make(map[string]bool, 0)
@@ -500,12 +501,13 @@ func (p *Processor) calcRewardForUserPlaying(
 			WithField("data", string(data)).
 			WithField("err", err).
 			Error("error.read-wallet")
-		return nil
+		return nil, 0
 	}
 	for _, w := range wallets {
 		mapUserWallet[w.UserId] = w
 	}
 	balanceResult := pb.BalanceResult{}
+	listFeeGame := make([]entity.FeeGame, 0)
 	for _, betResult := range updateFinish.BetResults {
 		balance := &pb.BalanceUpdate{
 			UserId:           betResult.UserId,
@@ -521,6 +523,10 @@ func (p *Processor) calcRewardForUserPlaying(
 			}
 			fee = balance.AmountChipAdd / 100 * int64(percentFeeGame)
 			balance.AmountChipCurrent = balance.AmountChipBefore + balance.AmountChipAdd - fee
+			listFeeGame = append(listFeeGame, entity.FeeGame{
+				UserID: balance.UserId,
+				Fee:    fee,
+			})
 		} else {
 			balance.AmountChipCurrent = balance.AmountChipBefore
 		}
@@ -539,7 +545,11 @@ func (p *Processor) calcRewardForUserPlaying(
 			AmountChipAdd:     0,
 		})
 	}
-	return &balanceResult
+	totalFee := int64(0)
+	for _, fee := range listFeeGame {
+		totalFee += fee.Fee
+	}
+	return &balanceResult, totalFee
 }
 
 func (p *Processor) notifyInitialDealCard(
