@@ -9,6 +9,7 @@ import (
 	"github.com/ciaolink-game-platform/blackjack-module/cgbdb"
 	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/usecase/engine"
+	"github.com/ciaolink-game-platform/cgp-common/lib"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -137,6 +138,7 @@ func (m *BaseProcessor) ProcessPresencesLeave(ctx context.Context,
 func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 	logger runtime.Logger,
 	nk runtime.NakamaModule,
+	db *sql.DB,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 	presences []runtime.Presence,
@@ -148,6 +150,7 @@ func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 			s.AddLeavePresence(presence)
 		} else {
 			s.RemovePresences(presence)
+			cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, []string{presence.GetUserId()}, "")
 			m.notifyUserChange(ctx, nk, logger, nil, dispatcher, s)
 		}
 	}
@@ -194,4 +197,35 @@ func (m *BaseProcessor) notifyUserChange(ctx context.Context,
 		logger, dispatcher,
 		int64(pb.OpCodeUpdate_OPCODE_USER_IN_TABLE_INFO),
 		msg, nil, nil, true)
+}
+
+func (m *BaseProcessor) report(
+	logger runtime.Logger,
+	balanceResult *pb.BalanceResult,
+	totalFee int64,
+	s *entity.MatchState,
+) {
+	report := lib.NewReportGame()
+	report.AddMatch(&pb.MatchData{
+		GameId:   0,
+		GameCode: s.Label.Code,
+		Mcb:      int64(s.Label.Bet),
+		ChipFee:  totalFee,
+	})
+	for _, b := range balanceResult.Updates {
+		report.AddPlayerData(&pb.PlayerData{
+			UserId:  b.UserId,
+			Chip:    b.AmountChipCurrent,
+			ChipAdd: b.AmountChipAdd,
+		})
+	}
+	data, status, err := report.Commit()
+	if err != nil || status > 300 {
+		if err != nil {
+			logger.Error("Report game (%s) operation -> url %s failed, response %s status %d err %s",
+				lib.HostReport, s.Label.Code, string(data), status, err.Error())
+		} else {
+			logger.Info("Report game (%s) operatio -> %s successful", s.Label.Code)
+		}
+	}
 }

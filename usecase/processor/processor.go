@@ -99,7 +99,7 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 	s.SetUpdateFinish(s.CalcGameFinish())
 
 	updateFinish := s.GetUpdateFinish()
-	balanceResult := p.calcRewardForUserPlaying(
+	balanceResult, totalFee := p.calcRewardForUserPlaying(
 		ctx, nk, logger, db, dispatcher, s, updateFinish,
 	)
 	s.SetBalanceResult(balanceResult)
@@ -112,6 +112,7 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_WALLET),
 		balanceResult, nil, nil, true,
 	)
+	p.report(logger, balanceResult, totalFee, s)
 }
 
 func (p *Processor) ProcessTurnbase(ctx context.Context,
@@ -186,6 +187,20 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 	if turnInfo.isNewPhase && turnInfo.roundCode == "playing" {
 		s.SetVisited(turnInfo.userId)
 		s.SetCurrentTurn(turnInfo.userId)
+		if len(s.GetLegalActions()) == 0 {
+			switch s.GetCurrentHandN0(turnInfo.userId) {
+			case pb.BlackjackHandN0_BLACKJACK_HAND_1ST:
+				if len(s.GetPlayerPartOfHand(turnInfo.userId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+					s.SetCurrentHandN0(turnInfo.userId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+				} else {
+					p.turnBaseEngine.NextPhase()
+					return
+				}
+			default:
+				p.turnBaseEngine.NextPhase()
+				return
+			}
+		}
 		s.SetUpCountDown(time.Duration(turnInfo.countDown * 1e9))
 		p.notifyUpdateTurn(ctx, nk, logger, dispatcher, s)
 	}
@@ -260,48 +275,48 @@ func (p *Processor) ProcessMessageFromUser(
 				action.UserId = message.GetUserId()
 				switch action.Code {
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE:
-					if s.IsAllowAction() && s.IsCanDoubleDownBet(action.UserId, wallet.Chips, s.GetCurrentHandN0()) {
-						chip := s.DoubleDownBet(action.UserId, s.GetCurrentHandN0())
-						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0())
+					if s.IsAllowAction() && s.IsCanDoubleDownBet(action.UserId, wallet.Chips, s.GetCurrentHandN0(action.UserId)) {
+						chip := s.DoubleDownBet(action.UserId, s.GetCurrentHandN0(action.UserId))
+						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
 						cards := p.engine.Deal(1)
-						s.AddCards(cards, action.UserId, s.GetCurrentHandN0())
+						s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
 						p.broadcastMessage(
 							logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
 							&pb.BlackjackUpdateDeal{
 								IsBanker:                 false,
 								IsRevealBankerHiddenCard: false,
 								UserId:                   action.UserId,
-								HandN0:                   s.GetCurrentHandN0(),
+								HandN0:                   s.GetCurrentHandN0(action.UserId),
 								NewCards:                 cards,
 								Hand:                     s.GetPlayerHand(action.UserId),
 							}, nil, nil, true,
 						)
-						if s.GetCurrentHandN0() == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
-							s.SetCurrentHandN0(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+						if s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+							s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 							p.turnBaseEngine.RePhase()
 						} else {
 							p.turnBaseEngine.NextPhase()
 						}
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_HIT:
-					if s.IsAllowAction() && s.IsCanHit(action.UserId, s.GetCurrentHandN0()) {
+					if s.IsAllowAction() && s.IsCanHit(action.UserId, s.GetCurrentHandN0(action.UserId)) {
 						cards := p.engine.Deal(1)
-						s.AddCards(cards, action.UserId, s.GetCurrentHandN0())
+						s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
 						p.broadcastMessage(
 							logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
 							&pb.BlackjackUpdateDeal{
 								IsBanker:                 false,
 								IsRevealBankerHiddenCard: false,
 								UserId:                   action.UserId,
-								HandN0:                   s.GetCurrentHandN0(),
+								HandN0:                   s.GetCurrentHandN0(action.UserId),
 								NewCards:                 cards,
 								Hand:                     s.GetPlayerHand(action.UserId),
 							}, nil, nil, true,
 						)
 						// after that hit, player can't hit anymore -> next hand if possible else next turn
-						if !s.IsCanHit(action.UserId, s.GetCurrentHandN0()) {
-							if s.GetCurrentHandN0() == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
-								s.SetCurrentHandN0(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+						if !s.IsCanHit(action.UserId, s.GetCurrentHandN0(action.UserId)) {
+							if s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+								s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 								p.turnBaseEngine.RePhase()
 							} else {
 								p.turnBaseEngine.NextPhase()
@@ -316,8 +331,8 @@ func (p *Processor) ProcessMessageFromUser(
 						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED) // unspecified mean its not in any of 2 hands slot -> insurance slot
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_STAY:
-					if s.IsAllowAction() && s.GetCurrentHandN0() == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
-						s.SetCurrentHandN0(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+					if s.IsAllowAction() && s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+						s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 						p.turnBaseEngine.RePhase()
 						logger.Info("SWITCH TO 2ND HAND, ACTION_STAY")
 					} else {
@@ -327,7 +342,7 @@ func (p *Processor) ProcessMessageFromUser(
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT:
 					if s.IsAllowAction() && s.IsCanSplitHand(action.UserId, wallet.Chips) {
 						chip := s.SplitHand(action.UserId)
-						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0())
+						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
 						p.broadcastMessage(
 							logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 							&pb.BlackjackUpdateDesk{
@@ -374,7 +389,7 @@ func (p *Processor) notifyUpdateTurn(
 		IsInsuranceTurnEnter: false,
 		IsNewTurn:            true,
 		InTurn:               s.GetCurrentTurn(),
-		Hand_N0:              s.GetCurrentHandN0(),
+		Hand_N0:              s.GetCurrentHandN0(s.GetCurrentTurn()),
 		IsUpdateBet:          false,
 		Actions:              nil,
 		IsSplitHand:          false,
@@ -479,7 +494,7 @@ func (p *Processor) calcRewardForUserPlaying(
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 	updateFinish *pb.BlackjackUpdateFinish,
-) *pb.BalanceResult {
+) (*pb.BalanceResult, int64) {
 	listUserPlaying := s.GetPlayingPresences()
 	listUserId := make([]string, 0)
 	mapUserIdCalcReward := make(map[string]bool, 0)
@@ -500,12 +515,13 @@ func (p *Processor) calcRewardForUserPlaying(
 			WithField("data", string(data)).
 			WithField("err", err).
 			Error("error.read-wallet")
-		return nil
+		return nil, 0
 	}
 	for _, w := range wallets {
 		mapUserWallet[w.UserId] = w
 	}
 	balanceResult := pb.BalanceResult{}
+	listFeeGame := make([]entity.FeeGame, 0)
 	for _, betResult := range updateFinish.BetResults {
 		balance := &pb.BalanceUpdate{
 			UserId:           betResult.UserId,
@@ -521,6 +537,10 @@ func (p *Processor) calcRewardForUserPlaying(
 			}
 			fee = balance.AmountChipAdd / 100 * int64(percentFeeGame)
 			balance.AmountChipCurrent = balance.AmountChipBefore + balance.AmountChipAdd - fee
+			listFeeGame = append(listFeeGame, entity.FeeGame{
+				UserID: balance.UserId,
+				Fee:    fee,
+			})
 		} else {
 			balance.AmountChipCurrent = balance.AmountChipBefore
 		}
@@ -539,7 +559,11 @@ func (p *Processor) calcRewardForUserPlaying(
 			AmountChipAdd:     0,
 		})
 	}
-	return &balanceResult
+	totalFee := int64(0)
+	for _, fee := range listFeeGame {
+		totalFee += fee.Fee
+	}
+	return &balanceResult, totalFee
 }
 
 func (p *Processor) notifyInitialDealCard(

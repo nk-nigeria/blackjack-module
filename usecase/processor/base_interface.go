@@ -43,6 +43,7 @@ type IBaseProcessor interface {
 	ProcessPresencesLeavePending(ctx context.Context,
 		logger runtime.Logger,
 		nk runtime.NakamaModule,
+		db *sql.DB,
 		dispatcher runtime.MatchDispatcher,
 		s *entity.MatchState,
 		presences []runtime.Presence,

@@ -55,7 +55,7 @@ func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.O
 			messages[pb.OpCodeUpdate_OPCODE_UPDATE_TABLE] = &pb.BlackjackUpdateDesk{
 				IsInsuranceTurnEnter: s.IsAllowInsurance(),
 				InTurn:               s.GetCurrentTurn(),
-				Hand_N0:              s.GetCurrentHandN0(),
+				Hand_N0:              s.GetCurrentHandN0(s.GetCurrentTurn()),
 				IsUpdateLegalAction:  true,
 				Actions: &pb.BlackjackLegalActions{
 					UserId:  s.GetCurrentTurn(),
@@ -67,7 +67,7 @@ func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.O
 			messages[pb.OpCodeUpdate_OPCODE_UPDATE_TABLE] = &pb.BlackjackUpdateDesk{
 				IsInsuranceTurnEnter: s.IsAllowInsurance(),
 				InTurn:               s.GetCurrentTurn(),
-				Hand_N0:              s.GetCurrentHandN0(),
+				Hand_N0:              s.GetCurrentHandN0(s.GetCurrentTurn()),
 				IsUpdateLegalAction:  false,
 				Actions:              nil,
 			}
