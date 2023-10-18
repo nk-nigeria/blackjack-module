@@ -16,7 +16,7 @@ update-submodule-stg:
 	go get github.com/ciaolink-game-platform/cgp-common@main
 
 build:
-	./sync_pkg_3.11.sh
+	# ./sync_pkg_3.11.sh
 	go mod tidy
 	go mod vendor
 	docker run --rm -w "/app" -v "${APP_PATH}:/app" heroiclabs/nakama-pluginbuilder:3.11.0 build -buildvcs=false --trimpath --buildmode=plugin -o ./bin/${APP_NAME}
@@ -26,8 +26,8 @@ sync:
 	ssh root@cgpdev 'cd /root/cgp-server && docker restart nakama'
 
 syncdev:
-	rsync -aurv --delete ./bin/${APP_NAME} root@cgpdev:/root/cgp-server/dev/data/modules/bin/
-	ssh root@cgpdev 'cd /root/cgp-server/dev && docker restart nakama_dev'
+	rsync -aurv --delete ./bin/${APP_NAME} root@cgpdev:/root/cgp-server-dev/dist/data/modules/bin/
+	ssh root@cgpdev 'cd /root/cgp-server-dev && docker restart nakama_dev'
 
 bsync: build sync
 

@@ -82,7 +82,7 @@ func (h *Hand) Eval(pos pb.BlackjackHandN0) (int32, pb.BlackjackHandType) {
 		return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
 	}
 	if point == 21 {
-		if len(h.first) == 2 {
+		if pos == 1 && len(h.first) == 2 && len(h.second) == 0 {
 			return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK
 		} else {
 			return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P

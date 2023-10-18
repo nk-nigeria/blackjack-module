@@ -71,7 +71,7 @@ func (m *MatchHandler) MatchLeave(ctx context.Context, logger runtime.Logger, db
 	logger.Info("match leave, state=%v, presences=%v", s, presences)
 
 	if m.machine.IsPlayingState() || m.machine.IsReward() {
-		m.processor.ProcessPresencesLeavePending(ctx, logger, nk, dispatcher, s, presences)
+		m.processor.ProcessPresencesLeavePending(ctx, logger, nk, db, dispatcher, s, presences)
 		return s
 	}
 	m.processor.ProcessPresencesLeave(ctx, logger, nk, db, dispatcher, s, presences)

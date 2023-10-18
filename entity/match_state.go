@@ -27,7 +27,7 @@ type MatchState struct {
 	userHands      map[string]*Hand
 	dealerHand     *Hand
 	currentTurn    string
-	currentHand    pb.BlackjackHandN0
+	currentHand    map[string]pb.BlackjackHandN0
 	gameState      pb.GameState
 	updateFinish   *pb.BlackjackUpdateFinish
 	isGameEnded    bool
@@ -50,7 +50,7 @@ func NewMatchState(label *MatchLabel) MatchState {
 		userHands:    make(map[string]*Hand, 0),
 		dealerHand:   &Hand{},
 		currentTurn:  "",
-		currentHand:  pb.BlackjackHandN0_BLACKJACK_HAND_1ST,
+		currentHand:  make(map[string]pb.BlackjackHandN0, 0),
 		gameState:    pb.GameState_GameStateIdle,
 		updateFinish: nil,
 		isGameEnded:  false,
@@ -73,7 +73,9 @@ func (s *MatchState) Init() {
 	}
 	s.currentTurn = ""
 	s.updateFinish = nil
-	s.currentHand = pb.BlackjackHandN0_BLACKJACK_HAND_1ST
+	for _, presence := range s.GetPlayingPresences() {
+		s.currentHand[presence.GetUserId()] = pb.BlackjackHandN0_BLACKJACK_HAND_1ST
+	}
 	s.isGameEnded = false
 }
 
@@ -101,8 +103,8 @@ func (s *MatchState) SetVisited(userId string) {
 	s.visited[userId] = true
 }
 
-func (s *MatchState) SetCurrentHandN0(v pb.BlackjackHandN0) { s.currentHand = v }
-func (s *MatchState) GetCurrentHandN0() pb.BlackjackHandN0  { return s.currentHand }
+func (s *MatchState) SetCurrentHandN0(userId string, v pb.BlackjackHandN0) { s.currentHand[userId] = v }
+func (s *MatchState) GetCurrentHandN0(userId string) pb.BlackjackHandN0    { return s.currentHand[userId] }
 
 func (s *MatchState) SetCurrentTurn(v string) { s.currentTurn = v }
 func (s *MatchState) GetCurrentTurn() string  { return s.currentTurn }
@@ -404,9 +406,9 @@ func (s *MatchState) getPlayerBetResult(userId string) *pb.BlackjackPLayerBetRes
 
 func (s *MatchState) GetLegalActions() []pb.BlackjackActionCode {
 	result := make([]pb.BlackjackActionCode, 0)
-	if s.userHands[s.currentTurn].PlayerCanDraw(s.currentHand) {
+	if s.userHands[s.currentTurn].PlayerCanDraw(s.currentHand[s.currentTurn]) {
 		result = append(result, pb.BlackjackActionCode_BLACKJACK_ACTION_HIT)
-		if len(s.GetPlayerPartOfHand(s.currentTurn, s.currentHand).Cards) == 2 {
+		if len(s.GetPlayerPartOfHand(s.currentTurn, s.currentHand[s.currentTurn]).Cards) == 2 {
 			result = append(result, pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE)
 			if s.userHands[s.currentTurn].PlayerCanSplit() {
 				result = append(result, pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT)

@@ -138,6 +138,7 @@ func (m *BaseProcessor) ProcessPresencesLeave(ctx context.Context,
 func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 	logger runtime.Logger,
 	nk runtime.NakamaModule,
+	db *sql.DB,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 	presences []runtime.Presence,
@@ -149,6 +150,7 @@ func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 			s.AddLeavePresence(presence)
 		} else {
 			s.RemovePresences(presence)
+			cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, []string{presence.GetUserId()}, "")
 			m.notifyUserChange(ctx, nk, logger, nil, dispatcher, s)
 		}
 	}
