@@ -200,12 +200,13 @@ func (m *BaseProcessor) notifyUserChange(ctx context.Context,
 }
 
 func (m *BaseProcessor) report(
+	ctx context.Context,
 	logger runtime.Logger,
 	balanceResult *pb.BalanceResult,
 	totalFee int64,
 	s *entity.MatchState,
 ) {
-	report := lib.NewReportGame()
+	report := lib.NewReportGame(ctx)
 	report.AddMatch(&pb.MatchData{
 		GameId:   0,
 		GameCode: s.Label.Code,
@@ -223,7 +224,7 @@ func (m *BaseProcessor) report(
 	if err != nil || status > 300 {
 		if err != nil {
 			logger.Error("Report game (%s) operation -> url %s failed, response %s status %d err %s",
-				lib.HostReport, s.Label.Code, string(data), status, err.Error())
+				report.ReportEndpoint(), s.Label.Code, string(data), status, err.Error())
 		} else {
 			logger.Info("Report game (%s) operatio -> %s successful", s.Label.Code)
 		}
