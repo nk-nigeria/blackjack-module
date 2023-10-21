@@ -20,7 +20,7 @@ require (
 
 require (
 	github.com/bwmarrin/snowflake v0.3.0
-	github.com/ciaolink-game-platform/cgp-common v0.0.0-20231012013311-eae971874373
+	github.com/ciaolink-game-platform/cgp-common v0.0.0-20231019144547-5fd45b862028
 	github.com/qmuntal/stateless v1.5.3
 	go.uber.org/zap v1.19.1
 	google.golang.org/grpc v1.42.0
