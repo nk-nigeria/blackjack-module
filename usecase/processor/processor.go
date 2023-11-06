@@ -112,7 +112,7 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_WALLET),
 		balanceResult, nil, nil, true,
 	)
-	p.report(ctx, logger, balanceResult, totalFee, s)
+	p.report(ctx, logger, nk, balanceResult, totalFee, s)
 }
 
 func (p *Processor) ProcessTurnbase(ctx context.Context,

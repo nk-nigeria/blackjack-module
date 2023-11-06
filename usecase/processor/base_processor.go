@@ -202,6 +202,7 @@ func (m *BaseProcessor) notifyUserChange(ctx context.Context,
 func (m *BaseProcessor) report(
 	ctx context.Context,
 	logger runtime.Logger,
+	nk runtime.NakamaModule,
 	balanceResult *pb.BalanceResult,
 	totalFee int64,
 	s *entity.MatchState,
@@ -220,7 +221,7 @@ func (m *BaseProcessor) report(
 			ChipAdd: b.AmountChipAdd,
 		})
 	}
-	data, status, err := report.Commit()
+	data, status, err := report.Commit(ctx, nk)
 	if err != nil || status > 300 {
 		if err != nil {
 			logger.Error("Report game (%s) operation -> url %s failed, response %s status %d err %s",
