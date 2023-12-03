@@ -1,7 +1,7 @@
 PROJECT_NAME=github.com/ciaolink-game-platform/blackjack-module
 APP_NAME=blackjack.so
 APP_PATH=$(PWD)
-
+NAKAMA_VER=3.19.0
 update-submodule-dev:
 	git checkout develop && git pull
 	git submodule update --init
@@ -19,10 +19,10 @@ build:
 	# ./sync_pkg_3.11.sh
 	go mod tidy
 	go mod vendor
-	docker run --rm -w "/app" -v "${APP_PATH}:/app" heroiclabs/nakama-pluginbuilder:3.11.0 build -buildvcs=false --trimpath --buildmode=plugin -o ./bin/${APP_NAME}
+	docker run --rm -w "/app" -v "${APP_PATH}:/app" heroiclabs/nakama-pluginbuilder:${NAKAMA_VER} build -buildvcs=false --trimpath --buildmode=plugin -o ./bin/${APP_NAME}
 
 sync:
-	rsync -aurv --delete ./bin/${APP_NAME} root@cgpdev:/root/cgp-server/dev/data/modules/
+	rsync -aurv --delete ./bin/${APP_NAME} root@cgpdev:/root/cgp-server/dist/data/modules/
 	ssh root@cgpdev 'cd /root/cgp-server && docker restart nakama'
 
 syncdev:
