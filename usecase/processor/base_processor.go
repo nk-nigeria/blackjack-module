@@ -3,17 +3,21 @@ package processor
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ciaolink-game-platform/blackjack-module/cgbdb"
 	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/usecase/engine"
+	"github.com/ciaolink-game-platform/cgp-common/define"
 	"github.com/ciaolink-game-platform/cgp-common/lib"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	"github.com/heroiclabs/nakama-common/api"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type BaseProcessor struct {
@@ -94,17 +98,10 @@ func (m *BaseProcessor) ProcessPresencesJoin(ctx context.Context,
 	s.JoinsInProgress -= len(newJoins)
 	// update match profile user
 	{
-		var listUserId []string
-		for _, p := range newJoins {
-			listUserId = append(listUserId, p.GetUserId())
+		for _, presence := range newJoins {
+			m.emitNkEvent(ctx, define.NakEventMatchJoin, nk, presence.GetUserId(), s)
 		}
-		matchId, _ := ctx.Value(runtime.RUNTIME_CTX_MATCH_ID).(string)
-		playingMatch := &pb.PlayingMatch{
-			Code:    entity.ModuleName,
-			MatchId: matchId,
-		}
-		playingMatchJson, _ := json.Marshal(playingMatch)
-		cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, listUserId, string(playingMatchJson))
+
 	}
 	m.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 	for _, presence := range presences {
@@ -128,10 +125,11 @@ func (m *BaseProcessor) ProcessPresencesLeave(ctx context.Context,
 ) {
 	s.RemovePresences(presences...)
 	var listUserId []string
-	for _, p := range presences {
-		listUserId = append(listUserId, p.GetUserId())
+	for _, presence := range presences {
+		listUserId = append(listUserId, presence.GetUserId())
+		m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, presence.GetUserId(), s)
 	}
-	cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, listUserId, "")
+	// cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, listUserId, "")
 	m.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 }
 
@@ -150,10 +148,38 @@ func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 			s.AddLeavePresence(presence)
 		} else {
 			s.RemovePresences(presence)
-			cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, []string{presence.GetUserId()}, "")
+			// cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, []string{presence.GetUserId()}, "")
+			m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, presence.GetUserId(), s)
 			m.notifyUserChange(ctx, nk, logger, nil, dispatcher, s)
 		}
 	}
+}
+
+func (m *BaseProcessor) ProcessMatchTerminate(ctx context.Context,
+	logger runtime.Logger,
+	nk runtime.NakamaModule,
+	db *sql.DB,
+	dispatcher runtime.MatchDispatcher,
+	s *entity.MatchState,
+) {
+	for _, presence := range s.GetPresences() {
+		m.emitNkEvent(ctx, define.NakEventMatchEnd, nk, presence.GetUserId(), s)
+	}
+}
+
+func (m *BaseProcessor) emitNkEvent(ctx context.Context, eventNk define.NakEvent, nk runtime.NakamaModule, userId string, s *entity.MatchState) {
+	matchId, _ := ctx.Value(runtime.RUNTIME_CTX_MATCH_ID).(string)
+	nk.Event(ctx, &api.Event{
+		Name:      string(eventNk),
+		Timestamp: timestamppb.Now(),
+		Properties: map[string]string{
+			"user_id":        userId,
+			"game_code":      s.Label.Code,
+			"end_match_unix": strconv.FormatInt(time.Now().Unix(), 10),
+			"match_id":       matchId,
+			"mcb":            strconv.FormatInt(int64(s.Label.Bet), 10),
+		},
+	})
 }
 
 func (m *BaseProcessor) broadcastMessage(logger runtime.Logger,
