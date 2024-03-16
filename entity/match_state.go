@@ -1,8 +1,6 @@
 package entity
 
 import (
-	"fmt"
-
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 	"github.com/emirpasic/gods/maps/linkedhashmap"
 	"github.com/heroiclabs/nakama-common/runtime"
@@ -13,6 +11,7 @@ const (
 	MaxPresences  = 5
 	MinBetAllowed = 1
 	MaxBetAllowed = 200
+	TickRate      = 2
 )
 
 type MatchState struct {
@@ -33,7 +32,7 @@ type MatchState struct {
 	isGameEnded    bool
 }
 
-func NewMatchState(label *MatchLabel) MatchState {
+func NewMatchState(label *pb.Match) MatchState {
 	return MatchState{
 		baseMatchState: baseMatchState{
 			Label:               label,
@@ -163,7 +162,7 @@ func (s *MatchState) SetUserBetById(userId string, bet *pb.BlackjackPlayerBet) {
 }
 
 func (s *MatchState) IsCanBet(userId string, balance int64, bet *pb.BlackjackBet) bool {
-	fmt.Printf("[LABEL.BET] = %v", s.Label.Bet)
+	// fmt.Printf("[LABEL.BET] = %v", s.Label.MarkUnit)
 	if _, found := s.userBets[userId]; !found {
 		return bet.Chips <= balance
 		// && bet.Chips <= int64(MaxBetAllowed*s.Label.Bet)
@@ -245,7 +244,7 @@ func (s *MatchState) Rebet(userId string) int64 {
 }
 
 func (s *MatchState) DoubleBet(userId string) int64 {
-	if _, found := s.userBets[userId]; found && s.userBets[userId].First >= MinBetAllowed*int64(s.Label.Bet) {
+	if _, found := s.userBets[userId]; found && s.userBets[userId].First >= MinBetAllowed*int64(s.Label.MarkUnit) {
 		r := s.userBets[userId].First
 		s.userBets[userId].First *= 2
 		s.userLastBets[userId] = s.userBets[userId].First

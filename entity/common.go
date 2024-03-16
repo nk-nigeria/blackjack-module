@@ -9,11 +9,20 @@ import (
 	"time"
 
 	"github.com/bwmarrin/snowflake"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 const (
 	ModuleName = "blackjack"
 )
+
+var DefaultMarshaler = &protojson.MarshalOptions{
+	UseEnumNumbers:  true,
+	EmitUnpopulated: false,
+}
+var DefaulUnmarshaler = &protojson.UnmarshalOptions{
+	DiscardUnknown: false,
+}
 
 // free game by lv
 // [level]=%

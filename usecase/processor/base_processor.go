@@ -174,10 +174,10 @@ func (m *BaseProcessor) emitNkEvent(ctx context.Context, eventNk define.NakEvent
 		Timestamp: timestamppb.Now(),
 		Properties: map[string]string{
 			"user_id":        userId,
-			"game_code":      s.Label.Code,
+			"game_code":      s.Label.Name,
 			"end_match_unix": strconv.FormatInt(time.Now().Unix(), 10),
 			"match_id":       matchId,
-			"mcb":            strconv.FormatInt(int64(s.Label.Bet), 10),
+			"mcb":            strconv.FormatInt(int64(s.Label.MarkUnit), 10),
 		},
 	})
 }
@@ -236,8 +236,8 @@ func (m *BaseProcessor) report(
 	report := lib.NewReportGame(ctx)
 	report.AddMatch(&pb.MatchData{
 		GameId:   0,
-		GameCode: s.Label.Code,
-		Mcb:      int64(s.Label.Bet),
+		GameCode: s.Label.Name,
+		Mcb:      int64(s.Label.MarkUnit),
 		ChipFee:  totalFee,
 	})
 	for _, b := range balanceResult.Updates {
@@ -251,9 +251,9 @@ func (m *BaseProcessor) report(
 	if err != nil || status > 300 {
 		if err != nil {
 			logger.Error("Report game (%s) operation -> url %s failed, response %s status %d err %s",
-				report.ReportEndpoint(), s.Label.Code, string(data), status, err.Error())
+				report.ReportEndpoint(), s.Label.Name, string(data), status, err.Error())
 		} else {
-			logger.Info("Report game (%s) operatio -> %s successful", s.Label.Code)
+			logger.Info("Report game (%s) operatio -> %s successful", s.Label.Name)
 		}
 	}
 }
