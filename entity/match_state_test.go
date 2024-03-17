@@ -8,10 +8,10 @@ import (
 )
 
 func TestMatchState(t *testing.T) {
-	s := NewMatchState(&MatchLabel{
-		Open:     5,
-		Bet:      MaxBetAllowed,
-		Code:     "test",
+	s := NewMatchState(&pb.Match{
+		Open:     false,
+		MarkUnit: MaxBetAllowed,
+		// Code:     "test",
 		Name:     "test_table",
 		Password: "",
 		MaxSize:  5,
