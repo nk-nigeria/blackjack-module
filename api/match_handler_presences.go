@@ -62,6 +62,8 @@ func (m *MatchHandler) MatchJoin(ctx context.Context, logger runtime.Logger, db 
 	logger.Info("match join, state=%v, presences=%v", s, presences)
 
 	m.processor.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, presences)
+	labelJson, _ := entity.DefaultMarshaler.Marshal(s.Label)
+	dispatcher.MatchLabelUpdate(string(labelJson))
 	return s
 }
 
@@ -75,6 +77,8 @@ func (m *MatchHandler) MatchLeave(ctx context.Context, logger runtime.Logger, db
 		return s
 	}
 	m.processor.ProcessPresencesLeave(ctx, logger, nk, db, dispatcher, s, presences)
+	labelJson, _ := entity.DefaultMarshaler.Marshal(s.Label)
+	dispatcher.MatchLabelUpdate(string(labelJson))
 	return s
 }
 

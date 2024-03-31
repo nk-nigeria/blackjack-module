@@ -2,6 +2,7 @@ package entity
 
 import (
 	"context"
+	"database/sql"
 	"math"
 	"time"
 
@@ -66,11 +67,11 @@ func (s *baseMatchState) IsReadyToPlay() bool { return s.Presences.Size() >= s.M
 func (s *baseMatchState) GetPresenceSize() int { return s.Presences.Size() }
 
 func (s *baseMatchState) AddPresence(ctx context.Context,
-	nk runtime.NakamaModule,
+	db *sql.DB,
 	presences []runtime.Presence,
 ) {
 	for _, presence := range presences {
-		m := NewMyPrecense(ctx, nk, presence)
+		m := NewMyPrecense(ctx, db, presence)
 		s.Presences.Put(presence.GetUserId(), m)
 		s.ResetUserNotInteract(presence.GetUserId())
 	}
@@ -165,4 +166,12 @@ func (s *baseMatchState) GetPresenceNotInteract(roundGame int) []runtime.Presenc
 
 func (s *baseMatchState) ResetUserNotInteract(userId string) {
 	s.PresencesNoInteract[userId] = 0
+}
+
+func (s *baseMatchState) UpdateLabel() {
+	s.Label.Size = int32(s.GetPresenceSize())
+	s.Label.Players = make([]string, 0)
+	for _, precense := range s.GetPresences() {
+		s.Label.Players = append(s.Label.Players, precense.GetUsername())
+	}
 }

@@ -20,7 +20,7 @@ const (
 const (
 	idleTimeout      = time.Second * 15
 	preparingTimeout = time.Second * 10
-	playTimeout      = time.Second * 15
+	playTimeout      = time.Second * 12
 	//playTimeout      = time.Second * 10
 	rewardTimeout = time.Second * 10
 	//rewardTimeout    = time.Second * 10

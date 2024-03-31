@@ -80,6 +80,7 @@ func (m *BaseProcessor) ProcessPresencesJoin(ctx context.Context,
 	s *entity.MatchState,
 	presences []runtime.Presence,
 ) {
+	defer s.UpdateLabel()
 	logger.Info("process presences join %v", presences)
 	// update new presence
 	newJoins := make([]runtime.Presence, 0)
@@ -94,7 +95,7 @@ func (m *BaseProcessor) ProcessPresencesJoin(ctx context.Context,
 			}
 		}
 	}
-	s.AddPresence(ctx, nk, newJoins)
+	s.AddPresence(ctx, db, newJoins)
 	s.JoinsInProgress -= len(newJoins)
 	// update match profile user
 	{
@@ -123,6 +124,7 @@ func (m *BaseProcessor) ProcessPresencesLeave(ctx context.Context,
 	s *entity.MatchState,
 	presences []runtime.Presence,
 ) {
+	defer s.UpdateLabel()
 	s.RemovePresences(presences...)
 	var listUserId []string
 	for _, presence := range presences {
@@ -141,6 +143,7 @@ func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 	s *entity.MatchState,
 	presences []runtime.Presence,
 ) {
+	defer s.UpdateLabel()
 	logger.Info("process presences leave pending %v", presences)
 	for _, presence := range presences {
 		_, found := s.PlayingPresences.Get(presence.GetUserId())
