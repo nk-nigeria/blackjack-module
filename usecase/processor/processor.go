@@ -133,7 +133,7 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 			s.SetAllowAction(false)
 			if s.DealerPotentialBlackjack() && !s.IsAllowInsurance() {
 				s.SetAllowInsurance(true)
-				s.SetUpCountDown(time.Duration(p.turnBaseEngine.GetRemainCountDown()) * 1e9)
+				s.SetUpCountDown(12 * time.Second)
 				p.broadcastMessage(
 					logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 					&pb.BlackjackUpdateDesk{
