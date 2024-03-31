@@ -2,6 +2,7 @@ package entity
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 )
@@ -11,15 +12,16 @@ type MyPrecense struct {
 	AvatarId string
 	Chips    int64
 	VipLevel int64
+	Sid      int64
 }
 
 // type ListMyPrecense []MyPrecense
 
-func NewMyPrecense(ctx context.Context, nk runtime.NakamaModule, precense runtime.Presence) MyPrecense {
+func NewMyPrecense(ctx context.Context, db *sql.DB, precense runtime.Presence) MyPrecense {
 	m := MyPrecense{
 		Presence: precense,
 	}
-	profiles, err := GetProfileUsers(ctx, nk, precense.GetUserId())
+	profiles, err := GetProfileUsers(ctx, db, precense.GetUserId())
 	if err != nil {
 		return m
 	}
@@ -30,6 +32,7 @@ func NewMyPrecense(ctx context.Context, nk runtime.NakamaModule, precense runtim
 	m.AvatarId = p.AvatarId
 	m.Chips = p.AccountChip
 	m.VipLevel = p.VipLevel
+	m.Sid = p.UserSid
 	return m
 }
 
