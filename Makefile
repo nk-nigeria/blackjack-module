@@ -12,8 +12,8 @@ update-submodule-stg:
 	git checkout staging && git pull
 	git submodule update --init
 	git submodule update --remote
-	cd ./cgp-common && git checkout main && cd ..
-	go get github.com/ciaolink-game-platform/cgp-common@main
+	cd ./cgp-common && git checkout staging && cd ..
+	go get github.com/ciaolink-game-platform/cgp-common@staging
 
 build:
 	# ./sync_pkg_3.11.sh
@@ -21,7 +21,7 @@ build:
 	go mod vendor
 	docker run --rm -w "/app" -v "${APP_PATH}:/app" heroiclabs/nakama-pluginbuilder:${NAKAMA_VER} build -buildvcs=false --trimpath --buildmode=plugin -o ./bin/${APP_NAME}
 
-sync:
+syncstg:
 	rsync -aurv --delete ./bin/${APP_NAME} root@cgpdev:/root/cgp-server/dist/data/modules/
 	ssh root@cgpdev 'cd /root/cgp-server && docker restart nakama'
 
