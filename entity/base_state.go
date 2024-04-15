@@ -170,8 +170,13 @@ func (s *baseMatchState) ResetUserNotInteract(userId string) {
 
 func (s *baseMatchState) UpdateLabel() {
 	s.Label.Size = int32(s.GetPresenceSize())
-	s.Label.Players = make([]string, 0)
+	s.Label.Profiles = make([]*pb.SimpleProfile, 0)
 	for _, precense := range s.GetPresences() {
-		s.Label.Players = append(s.Label.Players, precense.GetUsername())
+		player := NewPlayer(precense)
+		s.Label.Profiles = append(s.Label.Profiles, &pb.SimpleProfile{
+			UserId:   precense.GetUserId(),
+			UserName: precense.GetUsername(),
+			UserSid:  player.Sid,
+		})
 	}
 }
