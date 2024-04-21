@@ -102,9 +102,7 @@ func (m *BaseProcessor) ProcessPresencesJoin(ctx context.Context,
 		for _, presence := range newJoins {
 			m.emitNkEvent(ctx, define.NakEventMatchJoin, nk, presence.GetUserId(), s)
 		}
-
 	}
-	m.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 	for _, presence := range presences {
 		messages := m.engine.RejoinUserMessage(s, presence.GetUserId())
 		if messages == nil {
@@ -114,6 +112,7 @@ func (m *BaseProcessor) ProcessPresencesJoin(ctx context.Context,
 			m.broadcastMessage(logger, dispatcher, int64(k), msg, []runtime.Presence{presence}, nil, true)
 		}
 	}
+	m.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 }
 
 func (m *BaseProcessor) ProcessPresencesLeave(ctx context.Context,
