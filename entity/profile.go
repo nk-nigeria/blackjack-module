@@ -68,6 +68,36 @@ func GetProfileUsers(ctx context.Context, db *sql.DB, userIDs ...string) (ListPr
 	return listProfile, nil
 }
 
+func ParseProfile(user *api.Account) *pb.Profile {
+	u := user.User
+	var metadata map[string]interface{}
+	json.Unmarshal([]byte(u.GetMetadata()), &metadata)
+	profile := &pb.Profile{
+		UserId:      u.GetId(),
+		UserName:    u.GetUsername(),
+		DisplayName: u.GetDisplayName(),
+		Status:      InterfaceToString(metadata["status"]),
+		AvatarId:    InterfaceToString(metadata["avatar_id"]),
+		VipLevel:    ToInt64(metadata["vip_level"], 0),
+		// UserSid:     user.Sid,
+	}
+	playingMatchJson := InterfaceToString(metadata["playing_in_match"])
+
+	if playingMatchJson == "" {
+		profile.PlayingMatch = nil
+	} else {
+		profile.PlayingMatch = &pb.PlayingMatch{}
+		json.Unmarshal([]byte(playingMatchJson), profile.PlayingMatch)
+	}
+	if user.GetWallet() != "" {
+		wallet, err := ParseWallet(user.GetWallet())
+		if err == nil {
+			profile.AccountChip = wallet.Chips
+		}
+	}
+	return profile
+}
+
 func GetProfileUser(ctx context.Context, db *sql.DB, userID string) (*pb.Profile, error) {
 	listProfile, err := GetProfileUsers(ctx, db, userID)
 	if err != nil {
