@@ -217,11 +217,14 @@ func (s *MatchState) DoubleDownBet(userId string, pos pb.BlackjackHandN0) int64 
 	return r
 }
 
-func (s *MatchState) IsCanSplitHand(userId string, balance int64) bool {
-	if balance >= s.userBets[userId].First {
-		return s.userHands[userId].PlayerCanSplit()
+func (s *MatchState) IsCanSplitHand(userId string, balance int64) (allow bool, enougChip bool) {
+	enougChip = balance >= s.userBets[userId].First
+	allow = false
+	if !enougChip {
+		return allow, enougChip
 	}
-	return false
+	allow = s.userHands[userId].PlayerCanSplit()
+	return allow, enougChip
 }
 
 func (s *MatchState) SplitHand(userId string) int64 {
@@ -265,27 +268,32 @@ func (s *MatchState) DoubleBet(userId string) int64 {
 	return 0
 }
 
-func (s *MatchState) IsCanRebet(userId string, balance int64) bool {
+func (s *MatchState) IsCanRebet(userId string, balance int64) (allow bool, enougChip bool) {
 	if _, found := s.userBets[userId]; found {
-		return false
+		return false, true
 	}
 	if _, found := s.userLastBets[userId]; !found || s.userLastBets[userId] > balance {
-		return false
+		return false, false
 	}
-	return true
+	return true, true
 }
 
-func (s *MatchState) IsCanDoubleBet(userId string, balance int64) bool {
+func (s *MatchState) IsCanDoubleBet(userId string, balance int64) (allow bool, enougChip bool) {
+	allow = false
+	chipNeed := int64(0)
 	if _, found := s.userBets[userId]; found {
-		if s.userBets[userId].First > balance {
-			return false
-		} else {
-			return true
-		}
-	} else if _, found := s.userLastBets[userId]; found && s.userLastBets[userId]*2 <= balance {
-		return true
+		chipNeed = s.userBets[userId].First
+		allow = true
+	} else if _, found := s.userLastBets[userId]; found {
+		allow = true
+		chipNeed = s.userLastBets[userId] * 2
 	}
-	return false
+	enougChip = chipNeed <= balance
+	if !enougChip {
+		allow = false
+	}
+	return allow, enougChip
+
 }
 
 func (s *MatchState) IsCanHit(userId string, pos pb.BlackjackHandN0) bool {

@@ -240,19 +240,27 @@ func (p *Processor) ProcessMessageFromUser(
 			s.ResetUserNotInteract(bet.UserId)
 			switch bet.Code {
 			case pb.BlackjackBetCode_BLACKJACK_BET_DOUBLE:
-				if s.IsCanDoubleBet(bet.UserId, wallet.Chips) {
+				allow, enoughChip := s.IsCanDoubleBet(bet.UserId, wallet.Chips)
+				if allow {
 					chip := s.DoubleBet(bet.UserId)
 					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, bet.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+				} else if !enoughChip {
+					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher)
 				}
 			case pb.BlackjackBetCode_BLACKJACK_BET_REBET:
-				if s.IsCanRebet(bet.UserId, wallet.Chips) {
+				allow, enoughChip := s.IsCanRebet(bet.UserId, wallet.Chips)
+				if allow {
 					chip := s.Rebet(bet.UserId)
 					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, bet.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+				} else if !enoughChip {
+					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher)
 				}
 			case pb.BlackjackBetCode_BLACKJACK_BET_NORMAL:
 				if s.IsCanBet(bet.UserId, wallet.Chips, bet) {
 					s.AddBet(bet)
 					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, bet.UserId, bet.Chips, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+				} else {
+					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher)
 				}
 			}
 		case pb.OpCodeRequest_OPCODE_REQUEST_DECLARE_CARDS:
@@ -327,9 +335,14 @@ func (p *Processor) ProcessMessageFromUser(
 						}
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_INSURANCE:
-					if s.IsAllowInsurance() && s.IsCanInsuranceBet(action.UserId, wallet.Chips) {
+					if !s.IsAllowInsurance() {
+						continue
+					}
+					if s.IsCanInsuranceBet(action.UserId, wallet.Chips) {
 						chip := s.InsuranceBet(action.UserId)
 						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED) // unspecified mean its not in any of 2 hands slot -> insurance slot
+					} else {
+						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher)
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_STAY:
 					if s.IsAllowAction() && s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
@@ -341,23 +354,32 @@ func (p *Processor) ProcessMessageFromUser(
 						logger.Info("SWITCH TO NEXT PHASE, ACTION_STAY")
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT:
-					if s.IsAllowAction() && s.IsCanSplitHand(action.UserId, wallet.Chips) {
-						chip := s.SplitHand(action.UserId)
-						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
-						p.broadcastMessage(
-							logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
-							&pb.BlackjackUpdateDesk{
-								IsSplitHand: true,
-								Hand:        s.GetPlayerHand(action.UserId),
-							}, nil, nil, true,
-						)
-						cards := p.engine.Deal(2)
-						s.AddCards([]*pb.Card{cards[0]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-						p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-						s.AddCards([]*pb.Card{cards[1]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-						p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-						p.turnBaseEngine.RePhase()
+					if !s.IsAllowAction() {
+						continue
 					}
+					allow, enoughChip := s.IsCanSplitHand(action.UserId, wallet.Chips)
+					if !enoughChip {
+						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher)
+						continue
+					}
+					if !allow {
+						continue
+					}
+					chip := s.SplitHand(action.UserId)
+					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
+					p.broadcastMessage(
+						logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
+						&pb.BlackjackUpdateDesk{
+							IsSplitHand: true,
+							Hand:        s.GetPlayerHand(action.UserId),
+						}, nil, nil, true,
+					)
+					cards := p.engine.Deal(2)
+					s.AddCards([]*pb.Card{cards[0]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+					p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+					s.AddCards([]*pb.Card{cards[1]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+					p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+					p.turnBaseEngine.RePhase()
 				}
 			}
 		case pb.OpCodeRequest_OPCODE_REQUEST_INFO_TABLE:
@@ -437,11 +459,8 @@ func (p *Processor) notifyUpdateBet(
 		}
 	}
 	if wallet.Chips-chip <= 0 {
-		updateDesk.Error = &pb.Error{
-			Code:      int64(pb.ErrorType_ERROR_TYPE_CHIP_NOT_ENOUGH),
-			Error:     pb.ErrorType_ERROR_TYPE_CHIP_NOT_ENOUGH.String(),
-			ErrorType: pb.ErrorType_ERROR_TYPE_CHIP_NOT_ENOUGH,
-		}
+		p.notifyNotEnoughChip(ctx, nk, logger, dispatcher)
+		return
 	}
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
@@ -464,6 +483,29 @@ func (p *Processor) notifyUpdateBet(
 	)
 }
 
+func (p *Processor) notifyNotEnoughChip(
+	ctx context.Context,
+	nk runtime.NakamaModule,
+	logger runtime.Logger,
+	dispatcher runtime.MatchDispatcher) {
+	updateDesk := &pb.BlackjackUpdateDesk{
+		IsInsuranceTurnEnter: false,
+		IsNewTurn:            false,
+		IsUpdateBet:          true,
+		IsUpdateLegalAction:  false,
+		IsSplitHand:          false,
+		Bet:                  nil,
+	}
+	updateDesk.Error = &pb.Error{
+		Code:      int64(pb.ErrorType_ERROR_TYPE_CHIP_NOT_ENOUGH),
+		Error:     pb.ErrorType_ERROR_TYPE_CHIP_NOT_ENOUGH.String(),
+		ErrorType: pb.ErrorType_ERROR_TYPE_CHIP_NOT_ENOUGH,
+	}
+	p.broadcastMessage(
+		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
+		updateDesk, nil, nil, true,
+	)
+}
 func (p *Processor) updateChipByResultGameFinish(
 	ctx context.Context,
 	nk runtime.NakamaModule,
