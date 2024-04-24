@@ -283,7 +283,11 @@ func (p *Processor) ProcessMessageFromUser(
 				action.UserId = message.GetUserId()
 				switch action.Code {
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE:
-					if !s.IsAllowAction() || !s.IsCanDoubleDownBet(action.UserId, wallet.Chips, s.GetCurrentHandN0(action.UserId)) {
+					if !s.IsAllowAction() {
+						continue
+					}
+					if !s.IsCanDoubleDownBet(action.UserId, wallet.Chips, s.GetCurrentHandN0(action.UserId)) {
+						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
 						continue
 					}
 					chip := s.DoubleDownBet(action.UserId, s.GetCurrentHandN0(action.UserId))
