@@ -56,4 +56,12 @@ type IBaseProcessor interface {
 		dispatcher runtime.MatchDispatcher,
 		s *entity.MatchState,
 	)
+
+	ProcessMatchKick(ctx context.Context,
+		logger runtime.Logger,
+		nk runtime.NakamaModule,
+		db *sql.DB,
+		dispatcher runtime.MatchDispatcher,
+		s *entity.MatchState,
+	)
 }

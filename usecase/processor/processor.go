@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ciaolink-game-platform/cgp-common/lib"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 
 	"github.com/ciaolink-game-platform/blackjack-module/entity"
@@ -397,6 +398,18 @@ func (p *Processor) ProcessMessageFromUser(
 			)
 		}
 	}
+}
+
+func (p *Processor) ProcessMatchKick(ctx context.Context,
+	logger runtime.Logger,
+	nk runtime.NakamaModule,
+	db *sql.DB,
+	dispatcher runtime.MatchDispatcher,
+	s *entity.MatchState,
+) {
+	// dispatcher.MatchKick()
+	minChipRequire := s.Label.Bet.AgLeave
+	lib.MatchKick(ctx, logger, nk, dispatcher, minChipRequire, s.GetPresences()...)
 }
 
 //********************* Private functions *************************

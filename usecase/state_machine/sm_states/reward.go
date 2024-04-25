@@ -48,6 +48,7 @@ func (s *StateReward) Exit(ctx context.Context, _ ...interface{}) error {
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	state := procPkg.GetState()
 	state.ResetBalanceResult()
+	procPkg.GetProcessor().ProcessMatchKick(procPkg.GetContext(), procPkg.GetLogger(), procPkg.GetNK(), procPkg.GetDb(), procPkg.GetDispatcher(), state)
 	return nil
 }
 
