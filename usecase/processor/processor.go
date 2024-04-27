@@ -407,9 +407,36 @@ func (p *Processor) ProcessMatchKick(ctx context.Context,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 ) {
-	// dispatcher.MatchKick()
-	minChipRequire := s.Label.Bet.AgLeave
-	lib.MatchKick(ctx, logger, nk, dispatcher, minChipRequire, s.GetPresences()...)
+	// kick user not interact
+	presenseNotInteract := make(map[string]runtime.Presence)
+	{
+		precenses := s.GetPresences()
+		for _, precense := range precenses {
+			countNoInteract := s.PresencesNoInteract[precense.GetUserId()]
+			if countNoInteract >= 3 {
+				presenseNotInteract[precense.GetUserId()] = precense
+			}
+		}
+		if len(presenseNotInteract) > 0 {
+			list := make([]runtime.Presence, 0)
+			for _, v := range presenseNotInteract {
+				list = append(list, v)
+			}
+			p.broadcastMessage(logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_KICK_OFF_THE_TABLE), nil, list, nil, true)
+			dispatcher.MatchKick(list)
+		}
+	}
+	// kick by not enough chip
+	{
+		list := make([]runtime.Presence, 0)
+		for _, precense := range s.GetPresences() {
+			if _, exist := presenseNotInteract[precense.GetUserId()]; !exist {
+				list = append(list, precense)
+			}
+		}
+		minChipRequire := s.Label.Bet.AgLeave
+		lib.MatchKick(ctx, logger, nk, dispatcher, minChipRequire, list...)
+	}
 }
 
 //********************* Private functions *************************
@@ -588,7 +615,8 @@ func (p *Processor) calcRewardForUserPlaying(
 		return nil, 0
 	}
 	for _, w := range wallets {
-		mapUserWallet[w.UserId] = w
+		v := w
+		mapUserWallet[w.UserId] = v
 	}
 	balanceResult := pb.BalanceResult{}
 	listFeeGame := make([]entity.FeeGame, 0)
