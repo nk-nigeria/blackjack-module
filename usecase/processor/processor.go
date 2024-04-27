@@ -413,7 +413,7 @@ func (p *Processor) ProcessMatchKick(ctx context.Context,
 		precenses := s.GetPresences()
 		for _, precense := range precenses {
 			countNoInteract := s.PresencesNoInteract[precense.GetUserId()]
-			if countNoInteract >= 3 {
+			if countNoInteract >= 1 {
 				presenseNotInteract[precense.GetUserId()] = precense
 			}
 		}
