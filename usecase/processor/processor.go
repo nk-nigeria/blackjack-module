@@ -616,7 +616,7 @@ func (p *Processor) calcRewardForUserPlaying(
 	}
 	for _, w := range wallets {
 		v := w
-		mapUserWallet[w.UserId] = v
+		mapUserWallet[v.UserId] = v
 	}
 	balanceResult := pb.BalanceResult{}
 	listFeeGame := make([]entity.FeeGame, 0)
