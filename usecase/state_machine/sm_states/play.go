@@ -36,8 +36,9 @@ func (s *StatePlay) Enter(ctx context.Context, _ ...interface{}) error {
 	state.SetupMatchPresence()
 	procPkg.GetProcessor().ProcessNewGame(
 		procPkg.GetContext(),
-		procPkg.GetNK(),
 		procPkg.GetLogger(),
+		procPkg.GetNK(),
+		procPkg.GetDb(),
 		procPkg.GetDispatcher(), state)
 	return nil
 }

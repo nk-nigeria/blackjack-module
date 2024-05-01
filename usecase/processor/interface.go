@@ -11,8 +11,9 @@ import (
 type IProcessor interface {
 	ProcessNewGame(
 		ctx context.Context,
-		nk runtime.NakamaModule,
 		logger runtime.Logger,
+		nk runtime.NakamaModule,
+		db *sql.DB,
 		dispatcher runtime.MatchDispatcher,
 		s *entity.MatchState)
 

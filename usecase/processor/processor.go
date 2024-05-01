@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ciaolink-game-platform/cgp-common/bot"
 	"github.com/ciaolink-game-platform/cgp-common/lib"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 
@@ -19,26 +20,42 @@ import (
 type Processor struct {
 	*BaseProcessor
 	turnBaseEngine *TurnBaseEngine
+	emitBot        bool
 }
 
 func NewMatchProcessor(
 	marshaler *protojson.MarshalOptions,
 	unmarshaler *protojson.UnmarshalOptions,
 	engine engine.UseCase,
+
 ) IProcessor {
 	return &Processor{
 		NewBaseProcessor(marshaler, unmarshaler, engine),
 		NewTurnBaseEngine(),
+		false,
 	}
 }
 
 func (p *Processor) ProcessNewGame(
 	ctx context.Context,
-	nk runtime.NakamaModule,
 	logger runtime.Logger,
+	nk runtime.NakamaModule,
+	db *sql.DB,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 ) {
+	if !p.emitBot {
+		p.emitBot = true
+		precenses := make([]runtime.Presence, 0)
+		for _, presence := range s.GetPresences() {
+			if bot.IsBot(presence.GetUserId()) {
+				precenses = append(precenses, presence)
+			}
+		}
+		if len(precenses) > 0 {
+			p.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, precenses)
+		}
+	}
 	p.engine.NewGame(s)
 	listPlayerId := make([]string, 0)
 	// deal
