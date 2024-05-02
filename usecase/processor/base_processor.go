@@ -215,10 +215,43 @@ func (m *BaseProcessor) notifyUserChange(ctx context.Context,
 	db *sql.DB,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState) {
+	walletByUser := make(map[string]lib.Wallet, 0)
+	{
+		userIds := make([]string, 0)
+		for _, precense := range s.GetPresences() {
+			userIds = append(userIds, precense.GetUserId())
+		}
+		wallets, _ := lib.ReadWalletUsers(ctx, nk, logger, userIds...)
+		for _, wallet := range wallets {
+			v := wallet
+			walletByUser[wallet.UserId] = v
+		}
+	}
 	msg := &pb.UpdateTable{
 		Players:        entity.NewListPlayer(s.GetPresences()),
 		PlayingPlayers: entity.NewListPlayer(s.GetPlayingPresences()),
 		LeavePlayers:   entity.NewListPlayer(s.GetLeavePresences()),
+	}
+	for _, player := range msg.Players {
+		w, exist := walletByUser[player.GetId()]
+		if !exist {
+			continue
+		}
+		player.Wallet = strconv.FormatInt(w.Chips, 10)
+	}
+	for _, player := range msg.PlayingPlayers {
+		w, exist := walletByUser[player.GetId()]
+		if !exist {
+			continue
+		}
+		player.Wallet = strconv.FormatInt(w.Chips, 10)
+	}
+	for _, player := range msg.LeavePlayers {
+		w, exist := walletByUser[player.GetId()]
+		if !exist {
+			continue
+		}
+		player.Wallet = strconv.FormatInt(w.Chips, 10)
 	}
 
 	m.broadcastMessage(
