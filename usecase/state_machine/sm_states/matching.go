@@ -2,6 +2,7 @@ package smstates
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
@@ -23,6 +24,16 @@ func (s *StateMatching) Enter(ctx context.Context, _ ...interface{}) error {
 	state := procPkg.GetState()
 	state.SetUpCountDown(1 * time.Second)
 	procPkg.GetLogger().Info("apply leave presence")
+	listPrecense := state.GetPresenceNotInteract(1)
+	if len(listPrecense) > 0 {
+		listUserId := make([]string, len(listPrecense))
+		for _, p := range listPrecense {
+			listUserId = append(listUserId, p.GetUserId())
+		}
+		procPkg.GetLogger().Info("Kick %d user from math %s",
+			len(listPrecense), strings.Join(listUserId, ","))
+		state.AddLeavePresence(listPrecense...)
+	}
 	procPkg.GetProcessor().ProcessApplyPresencesLeave(
 		procPkg.GetContext(),
 		procPkg.GetLogger(),
