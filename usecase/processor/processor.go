@@ -79,7 +79,7 @@ func (p *Processor) ProcessNewGame(
 				phases: []*Phase{
 					{
 						code:     "main",
-						duration: time.Second * 5,
+						duration: time.Second * 12,
 					},
 				},
 			},
@@ -312,6 +312,7 @@ func (p *Processor) ProcessMessageFromUser(
 					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
 					cards := p.engine.Deal(1)
 					s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
+					s.Stay(action.UserId, s.GetCurrentHandN0(action.UserId))
 					p.broadcastMessage(
 						logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
 						&pb.BlackjackUpdateDeal{
@@ -367,6 +368,7 @@ func (p *Processor) ProcessMessageFromUser(
 						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_STAY:
+					s.Stay(action.UserId, s.GetCurrentHandN0(action.UserId))
 					if s.IsAllowAction() && s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
 						s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 						p.turnBaseEngine.RePhase()
@@ -482,7 +484,10 @@ func (p *Processor) notifyUpdateTurn(
 		if presence.GetUserId() == s.GetCurrentTurn() {
 			msg.Actions = legalActions
 		} else {
-			msg.Actions = nil
+			msg.Actions = &pb.BlackjackLegalActions{
+				UserId:  presence.GetUserId(),
+				Actions: s.GetPlayerLegalActions(presence.GetUserId()),
+			}
 		}
 		p.broadcastMessage(
 			logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
