@@ -234,6 +234,7 @@ func (p *Processor) ProcessMessageFromUser(
 	s *entity.MatchState,
 ) {
 	for _, message := range messages {
+		lib.HandlerTipInGameEvent(ctx, nk, logger, dispatcher, message)
 		switch pb.OpCodeRequest(message.GetOpCode()) {
 		case pb.OpCodeRequest_OPCODE_REQUEST_BET:
 			if !s.IsAllowBet() {
@@ -250,12 +251,12 @@ func (p *Processor) ProcessMessageFromUser(
 				continue
 			}
 			bet.UserId = message.GetUserId()
+			s.ResetUserNotInteract(bet.UserId)
 			wallet, err := entity.ReadWalletUser(ctx, nk, logger, bet.UserId)
 			if err != nil {
 				logger.Error("error.read-user-wallet")
 				continue
 			}
-			s.ResetUserNotInteract(bet.UserId)
 			switch bet.Code {
 			case pb.BlackjackBetCode_BLACKJACK_BET_DOUBLE:
 				allow, enoughChip := s.IsCanDoubleBet(bet.UserId, wallet.Chips)
