@@ -60,6 +60,7 @@ func (p *Processor) ProcessNewGame(
 	listPlayerId := make([]string, 0)
 	// deal
 	for _, presence := range s.GetPlayingPresences() {
+		s.ResetUserNotInteract(presence.GetUserId())
 		listPlayerId = append(listPlayerId, presence.GetUserId())
 		s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	}
