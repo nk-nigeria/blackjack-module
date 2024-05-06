@@ -4,70 +4,41 @@ import pb "github.com/ciaolink-game-platform/cgp-common/proto"
 
 type Hand struct {
 	userId string
-	first  *SubHand
-	second *SubHand
+	first  []*pb.Card
+	second []*pb.Card
 }
 
-type SubHand struct {
-	cards    []*pb.Card
-	point    int
-	handType pb.BlackjackHandType
-	stay     bool
-}
-
-func (h *SubHand) AddCards(c []*pb.Card) {
-	h.cards = append(h.cards, c...)
-}
-
-func (h *SubHand) ToPb() *pb.BlackjackHand {
-	return &pb.BlackjackHand{
-		Cards: h.cards,
-		Point: int32(h.point),
-		Type:  h.handType,
-	}
-}
-
-func (h *SubHand) Stay() {
-	h.stay = true
-}
-
-func NewPlayerHand(userId string, first []*pb.Card, second []*pb.Card) *Hand {
+func NewHand(userId string, first []*pb.Card, second []*pb.Card) *Hand {
 	return &Hand{
 		userId: userId,
-		first: &SubHand{
-			cards: first,
-		},
-		second: &SubHand{
-			cards: second,
-		},
-	}
-}
-
-func NewSubHand(cards []*pb.Card) *SubHand {
-	return &SubHand{
-		cards: cards,
-		stay:  false,
+		first:  first,
+		second: second,
 	}
 }
 
 func NewHandFromPb(v *pb.BlackjackPlayerHand) *Hand {
 	return &Hand{
 		userId: v.UserId,
-		first: &SubHand{
-			cards: v.First.Cards,
-		},
-		second: &SubHand{
-			cards: v.Second.Cards,
-		},
+		first:  v.First.Cards,
+		second: v.Second.Cards,
 	}
 }
 
 func (h *Hand) ToPb() *pb.BlackjackPlayerHand {
-	h.Eval()
+	point1, hand1Type := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	point2, hand2Type := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 	return &pb.BlackjackPlayerHand{
 		UserId: h.userId,
-		First:  h.first.ToPb(),
-		Second: h.second.ToPb(),
+		First: &pb.BlackjackHand{
+			Cards: h.first,
+			Point: point1,
+			Type:  hand1Type,
+		},
+		Second: &pb.BlackjackHand{
+			Cards: h.second,
+			Point: point2,
+			Type:  hand2Type,
+		},
 	}
 }
 
@@ -99,94 +70,90 @@ func calculatePoint(cards []*pb.Card) int32 {
 	return point
 }
 
-func (h *Hand) Eval() {
-	h.first.point = int(calculatePoint(h.first.cards))
-	if h.first.point == 0 {
-		h.first.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
-	} else if h.first.point == 21 {
-		if len(h.first.cards) == 2 && (h.second == nil || len(h.second.cards) == 0) {
-			h.first.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK
-		} else {
-			h.first.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P
-		}
-	} else if h.first.point > 21 {
-		h.first.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED
+// Eval(1) if want to evaluate 1st hand, any else for 2nd hand
+func (h *Hand) Eval(pos pb.BlackjackHandN0) (int32, pb.BlackjackHandType) {
+	point := int32(0)
+	if pos == 1 {
+		point = calculatePoint(h.first)
 	} else {
-		h.first.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL
+		point = calculatePoint(h.second)
 	}
-	if h.second != nil && len(h.second.cards) > 0 {
-		h.second.point = int(calculatePoint(h.second.cards))
-		if h.second.point == 0 {
-			h.second.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
-		} else if h.second.point == 21 {
-			h.second.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P
-		} else if h.second.point > 21 {
-			h.second.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED
+	if point == 0 {
+		return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
+	}
+	if point == 21 {
+		if pos == 1 && len(h.first) == 2 && len(h.second) == 0 {
+			return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK
 		} else {
-			h.second.handType = pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL
+			return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P
 		}
+	} else if point > 21 {
+		return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED
 	}
+	return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL
 }
 
 // Dealer must draw on lower than 17 and stand on >= 17
 func (h *Hand) DealerMustDraw() bool {
-	return calculatePoint(h.first.cards) < 17
+	return calculatePoint(h.first) < 17
 }
 
 func (h *Hand) DealerPotentialBlackjack() bool {
-	return h.first.cards[0].Rank == pb.CardRank_RANK_A
+	return h.first[0].Rank == pb.CardRank_RANK_A
 }
 
 // Check if player can draw on current hand, call with pos=1 for 1st hand, else 2nd hand
 func (h *Hand) PlayerCanDraw(pos pb.BlackjackHandN0) bool {
 	if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
-		if h.first.stay {
-			return false
-		}
-		return calculatePoint(h.first.cards) < 21
+		return calculatePoint(h.first) < 21
 	} else {
-		if h.second.stay {
-			return false
-		}
-		return calculatePoint(h.second.cards) < 21
+		return calculatePoint(h.second) < 21
 	}
 }
 
 func (h *Hand) PlayerCanSplit() bool {
-	return (h.second == nil || len(h.second.cards) == 0) &&
-		len(h.first.cards) == 2 &&
-		getCardPoint(h.first.cards[0].Rank) == getCardPoint(h.first.cards[1].Rank)
+	return (h.second == nil || len(h.second) == 0) &&
+		len(h.first) == 2 &&
+		getCardPoint(h.first[0].Rank) == getCardPoint(h.first[1].Rank)
 }
 
 func (h *Hand) Split() {
-	h.second = &SubHand{
-		cards: []*pb.Card{
-			h.first.cards[1],
-		},
+	h.second = []*pb.Card{
+		h.first[1],
 	}
-	h.first = &SubHand{
-		cards: []*pb.Card{
-			h.first.cards[0],
-		},
+	h.first = []*pb.Card{
+		h.first[0],
+	}
+}
+
+func (h *Hand) AddCards(c []*pb.Card, pos pb.BlackjackHandN0) {
+	switch pos {
+	case pb.BlackjackHandN0_BLACKJACK_HAND_1ST:
+		h.first = append(h.first, c...)
+	case pb.BlackjackHandN0_BLACKJACK_HAND_2ND:
+		h.second = append(h.second, c...)
+	case pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED:
+		h.first = append(h.first, c...)
 	}
 }
 
 // comparing player hand with dealer hand, -1 -> lost, 1 -> win, 0 -> tie
-func (h *Hand) Compare(dealer *Hand) (int, int) {
-	h.Eval()
-	dealer.Eval()
+func (h *Hand) Compare(d *Hand) (int, int) {
+	hp1, ht1 := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	hp2, ht2 := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+	dp, dt := d.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	r1 := 0
 	r2 := 0
-	if h.first.handType != pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED {
-		if h.first.handType == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED {
+	if ht1 != pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED {
+		if ht1 == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED {
 			r1 = -1
 		} else {
-			if int(h.first.handType) > int(dealer.first.handType) {
+			if int(ht1) > int(dt) {
 				r1 = 1
-			} else if int(h.first.handType) == int(dealer.first.handType) {
-				if h.first.point > dealer.first.point {
+			} else if int(ht1) == int(dt) {
+				if hp1 > dp {
 					r1 = 1
-				} else if h.first.point < dealer.first.point {
+				} else if hp1 < dp {
 					r1 = -1
 				}
 			} else {
@@ -194,16 +161,16 @@ func (h *Hand) Compare(dealer *Hand) (int, int) {
 			}
 		}
 	}
-	if h.second.handType != pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED {
-		if h.second.handType == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED {
+	if ht2 != pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED {
+		if ht2 == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED {
 			r2 = -1
 		} else {
-			if int(h.second.handType) > int(dealer.first.handType) {
+			if int(ht2) > int(dt) {
 				r2 = 1
-			} else if int(h.second.handType) == int(dealer.first.handType) {
-				if h.second.point > dealer.first.point {
+			} else if int(ht2) == int(dt) {
+				if hp2 > dp {
 					r2 = 1
-				} else if h.second.point < dealer.first.point {
+				} else if hp2 < dp {
 					r2 = -1
 				}
 			} else {

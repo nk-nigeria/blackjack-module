@@ -68,7 +68,7 @@ func (s *MatchState) Init() {
 	}
 	s.balanceResult = nil
 	s.dealerHand = &Hand{
-		first: NewSubHand(make([]*pb.Card, 0)),
+		first: make([]*pb.Card, 0),
 	}
 	s.currentTurn = ""
 	s.updateFinish = nil
@@ -131,20 +131,16 @@ func (s *MatchState) GetDealerHand() *pb.BlackjackPlayerHand {
 
 func (s *MatchState) AddCards(cards []*pb.Card, userId string, handN0 pb.BlackjackHandN0) {
 	if userId == "" {
-		s.dealerHand.first.AddCards(cards)
+		s.dealerHand.AddCards(cards, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	} else {
 		if _, found := s.userHands[userId]; !found {
 			s.userHands[userId] = &Hand{
 				userId: userId,
-				first:  NewSubHand(make([]*pb.Card, 0)),
-				second: NewSubHand(make([]*pb.Card, 0)),
+				first:  make([]*pb.Card, 0),
+				second: make([]*pb.Card, 0),
 			}
 		}
-		if handN0 == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
-			s.userHands[userId].first.AddCards(cards)
-		} else {
-			s.userHands[userId].second.AddCards(cards)
-		}
+		s.userHands[userId].AddCards(cards, handN0)
 	}
 }
 
@@ -372,8 +368,7 @@ func (s *MatchState) getPlayerBetResult(userId string) *pb.BlackjackPLayerBetRes
 	// meaning that currently in insurance round
 	if insurance.BetAmount > 0 {
 		// case win bet -> game also ended
-		s.dealerHand.Eval()
-		if s.dealerHand.first.handType == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK {
+		if _, dt := s.dealerHand.Eval(1); dt == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK {
 			insurance.WinAmount = insurance.BetAmount * 2
 			insurance.Total = insurance.BetAmount + insurance.WinAmount
 			insurance.IsWin = 1
@@ -431,7 +426,7 @@ func (s *MatchState) GetLegalActions() []pb.BlackjackActionCode {
 	return result
 }
 
-func (s *MatchState) GetPlayerLegalActions(userId string) []pb.BlackjackActionCode {
+func (s *MatchState) GetLegalActionsByUserId(userId string) []pb.BlackjackActionCode {
 	result := make([]pb.BlackjackActionCode, 0)
 	if s.userHands[userId].PlayerCanDraw(s.currentHand[userId]) {
 		result = append(result, pb.BlackjackActionCode_BLACKJACK_ACTION_HIT)
@@ -465,16 +460,4 @@ func (s *MatchState) GetPlayersBet() []*pb.BlackjackPlayerBet {
 		})
 	}
 	return res
-}
-
-func (s *MatchState) Stay(userId string, pos pb.BlackjackHandN0) {
-	if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
-		if s.userHands[userId].first != nil {
-			s.userHands[userId].first.Stay()
-		}
-	} else {
-		if s.userHands[userId].second != nil {
-			s.userHands[userId].second.Stay()
-		}
-	}
 }
