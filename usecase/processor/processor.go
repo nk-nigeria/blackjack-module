@@ -258,7 +258,7 @@ func (p *Processor) ProcessMessageFromUser(
 				logger.Error("error.read-user-wallet")
 				continue
 			}
-			s.ResetUserNotInteract(bet.UserId)
+			// s.ResetUserNotInteract(bet.UserId)
 			switch bet.Code {
 			case pb.BlackjackBetCode_BLACKJACK_BET_DOUBLE:
 				allow, enoughChip := s.IsCanDoubleBet(bet.UserId, wallet.Chips)
@@ -296,6 +296,7 @@ func (p *Processor) ProcessMessageFromUser(
 				logger.Error("error.parse-action from [%s]", err.Error())
 				continue
 			} else {
+				s.ResetUserNotInteract(message.GetUserId())
 				wallet, err := entity.ReadWalletUser(ctx, nk, logger, action.UserId)
 				if err != nil {
 					logger.Error("error.read-wallet %v", err.Error())
