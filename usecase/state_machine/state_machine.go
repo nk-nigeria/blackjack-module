@@ -3,6 +3,7 @@ package state_machine
 import (
 	"context"
 
+	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
 	lib "github.com/ciaolink-game-platform/blackjack-module/usecase/state_machine/sm_states"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
@@ -94,6 +95,10 @@ func (m *Machine) configure(stateMachineState lib.StateMachineState) {
 		stateMachineState.OnTransitioning(ctx, t)
 		state := procPkg.GetState()
 		state.SetGameState(t.Destination.(pb.GameState))
+		if procPkg.GetDispatcher() != nil {
+			labelJson, _ := entity.DefaultMarshaler.Marshal(state.Label)
+			procPkg.GetDispatcher().MatchLabelUpdate(string(labelJson))
+		}
 	})
 
 	{

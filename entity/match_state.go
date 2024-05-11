@@ -27,9 +27,9 @@ type MatchState struct {
 	dealerHand     *Hand
 	currentTurn    string
 	currentHand    map[string]pb.BlackjackHandN0
-	gameState      pb.GameState
-	updateFinish   *pb.BlackjackUpdateFinish
-	isGameEnded    bool
+	// gameState      pb.GameState
+	updateFinish *pb.BlackjackUpdateFinish
+	isGameEnded  bool
 }
 
 func NewMatchState(label *pb.Match) MatchState {
@@ -50,7 +50,7 @@ func NewMatchState(label *pb.Match) MatchState {
 		dealerHand:   &Hand{},
 		currentTurn:  "",
 		currentHand:  make(map[string]pb.BlackjackHandN0, 0),
-		gameState:    pb.GameState_GameStateIdle,
+		// gameState:    pb.GameState_GameStateIdle,
 		updateFinish: nil,
 		isGameEnded:  false,
 	}
@@ -108,8 +108,8 @@ func (s *MatchState) GetCurrentHandN0(userId string) pb.BlackjackHandN0    { ret
 func (s *MatchState) SetCurrentTurn(v string) { s.currentTurn = v }
 func (s *MatchState) GetCurrentTurn() string  { return s.currentTurn }
 
-func (s *MatchState) GetGameState() pb.GameState  { return s.gameState }
-func (s *MatchState) SetGameState(v pb.GameState) { s.gameState = v }
+func (s *MatchState) GetGameState() pb.GameState  { return s.Label.GameState }
+func (s *MatchState) SetGameState(v pb.GameState) { s.Label.GameState = v }
 
 func (s *MatchState) SetIsGameEnded(v bool) { s.isGameEnded = v }
 func (s *MatchState) IsGameEnded() bool     { return s.isGameEnded }

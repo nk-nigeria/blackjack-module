@@ -98,20 +98,20 @@ func (m *BaseProcessor) ProcessPresencesJoin(ctx context.Context,
 	s.AddPresence(ctx, db, newJoins)
 	s.JoinsInProgress -= len(newJoins)
 	// update match profile user
-	{
-		for _, presence := range newJoins {
-			m.emitNkEvent(ctx, define.NakEventMatchJoin, nk, presence.GetUserId(), s)
-		}
-	}
+	userIDs := make([]string, 0)
 	for _, presence := range presences {
-		messages := m.engine.RejoinUserMessage(s, presence.GetUserId())
-		if messages == nil {
-			continue
-		}
-		for k, msg := range messages {
-			m.broadcastMessage(logger, dispatcher, int64(k), msg, []runtime.Presence{presence}, nil, true)
-		}
+		userIDs = append(userIDs, presence.GetUserId())
 	}
+	m.emitNkEvent(ctx, define.NakEventMatchJoin, nk, s, userIDs...)
+	// for _, presence := range presences {
+	// 	messages := m.engine.RejoinUserMessage(s, presence.GetUserId())
+	// 	if messages == nil {
+	// 		continue
+	// 	}
+	// 	for k, msg := range messages {
+	// 		m.broadcastMessage(logger, dispatcher, int64(k), msg, []runtime.Presence{presence}, nil, true)
+	// 	}
+	// }
 	m.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 }
 
@@ -126,10 +126,10 @@ func (m *BaseProcessor) ProcessPresencesLeave(ctx context.Context,
 	defer s.UpdateLabel()
 	s.RemovePresences(presences...)
 	var listUserId []string
-	for _, presence := range presences {
-		listUserId = append(listUserId, presence.GetUserId())
-		m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, presence.GetUserId(), s)
+	for _, p := range presences {
+		listUserId = append(listUserId, p.GetUserId())
 	}
+	m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, s, listUserId...)
 	// cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, listUserId, "")
 	m.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 }
@@ -144,6 +144,7 @@ func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 ) {
 	defer s.UpdateLabel()
 	logger.Info("process presences leave pending %v", presences)
+	userIdsLeave := make([]string, 0)
 	for _, presence := range presences {
 		_, found := s.PlayingPresences.Get(presence.GetUserId())
 		if found {
@@ -151,10 +152,12 @@ func (m *BaseProcessor) ProcessPresencesLeavePending(ctx context.Context,
 		} else {
 			s.RemovePresences(presence)
 			// cgbdb.UpdateUsersPlayingInMatch(ctx, logger, db, []string{presence.GetUserId()}, "")
-			m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, presence.GetUserId(), s)
+			// m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, presence.GetUserId(), s)
 			m.notifyUserChange(ctx, nk, logger, nil, dispatcher, s)
+			userIdsLeave = append(userIdsLeave, presence.GetUserId())
 		}
 	}
+	m.emitNkEvent(ctx, define.NakEventMatchLeave, nk, s, userIdsLeave...)
 }
 
 func (m *BaseProcessor) ProcessMatchTerminate(ctx context.Context,
@@ -164,18 +167,20 @@ func (m *BaseProcessor) ProcessMatchTerminate(ctx context.Context,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 ) {
+	userIds := make([]string, 0)
 	for _, presence := range s.GetPresences() {
-		m.emitNkEvent(ctx, define.NakEventMatchEnd, nk, presence.GetUserId(), s)
+		userIds = append(userIds, presence.GetUserId())
 	}
+	m.emitNkEvent(ctx, define.NakEventMatchEnd, nk, s, userIds...)
 }
 
-func (m *BaseProcessor) emitNkEvent(ctx context.Context, eventNk define.NakEvent, nk runtime.NakamaModule, userId string, s *entity.MatchState) {
+func (m *BaseProcessor) emitNkEvent(ctx context.Context, eventNk define.NakEvent, nk runtime.NakamaModule, s *entity.MatchState, userId ...string) {
 	matchId, _ := ctx.Value(runtime.RUNTIME_CTX_MATCH_ID).(string)
 	nk.Event(ctx, &api.Event{
 		Name:      string(eventNk),
 		Timestamp: timestamppb.Now(),
 		Properties: map[string]string{
-			"user_id":        userId,
+			"user_id":        strings.Join(userId, ","),
 			"game_code":      s.Label.Name,
 			"end_match_unix": strconv.FormatInt(time.Now().Unix(), 10),
 			"match_id":       matchId,

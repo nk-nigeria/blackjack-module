@@ -417,6 +417,14 @@ func (p *Processor) ProcessMessageFromUser(
 					InTurn:               s.GetCurrentTurn(),
 				}, []runtime.Presence{s.GetPresence(message.GetUserId())}, nil, true,
 			)
+		case pb.OpCodeRequest_OPCODE_REQUEST_SYNC_TABLE:
+			msgs := p.engine.RejoinUserMessage(s, message.GetUserId())
+			if msgs == nil {
+				continue
+			}
+			for k, msg := range msgs {
+				p.broadcastMessage(logger, dispatcher, int64(k), msg, []runtime.Presence{s.GetPresence(message.GetUserId())}, nil, true)
+			}
 		}
 	}
 }
