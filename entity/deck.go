@@ -62,6 +62,18 @@ func (d *Deck) Shuffle() {
 			d.ListCard.Cards[r], d.ListCard.Cards[i] = d.ListCard.Cards[i], d.ListCard.Cards[r]
 		}
 	}
+	// mock
+	// if d.ListCard.Cards[0].Rank != pb.CardRank_RANK_A {
+	// 	for idx, card := range d.ListCard.Cards {
+	// 		if idx == 0 {
+	// 			continue
+	// 		}
+	// 		if card.Rank == pb.CardRank_RANK_A {
+	// 			d.ListCard.Cards[0], d.ListCard.Cards[idx] = d.ListCard.Cards[idx], d.ListCard.Cards[0]
+	// 			break
+	// 		}
+	// 	}
+	// }
 }
 
 func (d *Deck) Deal(n int) (*pb.ListCard, error) {

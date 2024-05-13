@@ -89,6 +89,9 @@ func (s *StatePlay) Process(ctx context.Context, args ...interface{}) error {
 
 	if state.IsNeedNotifyCountDown() {
 		remainCountDown := int(math.Round(state.GetRemainCountDown()))
+		if remainCountDown < 0 {
+			return nil
+		}
 		procPkg.GetProcessor().NotifyUpdateGameState(
 			state,
 			procPkg.GetLogger(),

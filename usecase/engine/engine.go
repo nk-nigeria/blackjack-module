@@ -22,11 +22,11 @@ func (m *Engine) NewGame(s *entity.MatchState) error {
 }
 
 func (m *Engine) Deal(amount int) []*pb.Card {
-	if list, err := m.deck.Deal(amount); err != nil {
+	list, err := m.deck.Deal(amount)
+	if err != nil {
 		return nil
-	} else {
-		return list.Cards
 	}
+	return list.Cards
 }
 
 func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.OpCodeUpdate]proto.Message {

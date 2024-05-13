@@ -64,7 +64,18 @@ func (p *Processor) ProcessNewGame(
 		listPlayerId = append(listPlayerId, presence.GetUserId())
 		s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	}
-	s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	for {
+		cards := p.engine.Deal(2)
+		hasRankA := false
+		if len(cards) > 1 && cards[0].Rank == pb.CardRank_RANK_A {
+			hasRankA = true
+		}
+		if !hasRankA {
+			continue
+		}
+		s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+		break
+	}
 	p.notifyInitialDealCard(
 		ctx, nk, logger, dispatcher, s,
 	)
@@ -80,7 +91,7 @@ func (p *Processor) ProcessNewGame(
 				phases: []*Phase{
 					{
 						code:     "main",
-						duration: time.Second * 12,
+						duration: time.Second * 6,
 					},
 				},
 			},
@@ -152,7 +163,7 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 			s.SetAllowAction(false)
 			if s.DealerPotentialBlackjack() && !s.IsAllowInsurance() {
 				s.SetAllowInsurance(true)
-				s.SetUpCountDown(5 * time.Second)
+				s.SetUpCountDown(time.Duration(turnInfo.countDown) * time.Second)
 				p.broadcastMessage(
 					logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 					&pb.BlackjackUpdateDesk{
@@ -537,7 +548,7 @@ func (p *Processor) notifyUpdateBet(
 	}
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
-		updateDesk, nil, nil, true,
+		updateDesk, []runtime.Presence{s.GetPresence(userId)}, nil, true,
 	)
 	if updateDesk.Error != nil {
 		return
