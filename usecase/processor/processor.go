@@ -91,7 +91,7 @@ func (p *Processor) ProcessNewGame(
 				phases: []*Phase{
 					{
 						code:     "main",
-						duration: time.Second * 6,
+						duration: time.Second * 5,
 					},
 				},
 			},
