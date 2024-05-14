@@ -157,6 +157,7 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 		turnInfo = p.turnBaseEngine.Loop()
 	}
 	if turnInfo.isNewRound {
+		s.SetCurrentTurn(turnInfo.userId)
 		switch turnInfo.roundCode {
 		case "insurance":
 			s.SetAllowBet(false)
@@ -297,9 +298,11 @@ func (p *Processor) ProcessMessageFromUser(
 			}
 		case pb.OpCodeRequest_OPCODE_REQUEST_DECLARE_CARDS:
 			if s.GetGameState() != pb.GameState_GameStatePlay || s.GetCurrentTurn() == "" {
+				logger.WithField("user-id", message.GetUserId()).Error("current turn is empty")
 				continue
 			}
 			if s.GetCurrentTurn() != message.GetUserId() {
+				logger.WithField("user-id", message.GetUserId()).WithField("current-turn", s.GetCurrentTurn()).Error("current turn is not match")
 				continue
 			}
 			action := &pb.BlackjackAction{}
@@ -373,6 +376,7 @@ func (p *Processor) ProcessMessageFromUser(
 					}
 				case pb.BlackjackActionCode_BLACKJACK_ACTION_INSURANCE:
 					if !s.IsAllowInsurance() {
+						logger.WithField("user_id", message.GetUserId()).Info("not allow insurance")
 						continue
 					}
 					if s.IsCanInsuranceBet(action.UserId, wallet.Chips) {
@@ -546,6 +550,7 @@ func (p *Processor) notifyUpdateBet(
 		p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, userId)
 		return
 	}
+	// logger.WithField("user-id", userId).Info("update-bet")
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 		updateDesk, nil, nil, true,
@@ -574,6 +579,7 @@ func (p *Processor) notifyNotEnoughChip(
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 	userId string) {
+	logger.WithField("user-id", userId).Error("error.chip-not-enough")
 	updateDesk := &pb.BlackjackUpdateDesk{
 		IsInsuranceTurnEnter: false,
 		IsNewTurn:            false,
