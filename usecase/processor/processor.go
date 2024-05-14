@@ -548,7 +548,7 @@ func (p *Processor) notifyUpdateBet(
 	}
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
-		updateDesk, []runtime.Presence{s.GetPresence(userId)}, nil, true,
+		updateDesk, nil, nil, true,
 	)
 	if updateDesk.Error != nil {
 		return
