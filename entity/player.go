@@ -20,6 +20,7 @@ func NewPlayer(presence runtime.Presence) *pb.Player {
 		p.AvatarId = m.AvatarId
 		p.VipLevel = m.VipLevel
 		p.Wallet = strconv.FormatInt(m.Chips, 10)
+		p.Sid = m.Sid
 	}
 	if m, ok := presence.(*bot.BotPresence); ok {
 		account := &m.Account

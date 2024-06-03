@@ -63,6 +63,7 @@ func GetProfileUsers(ctx context.Context, db *sql.DB, userIDs ...string) (ListPr
 				profile.AccountChip = wallet.Chips
 			}
 		}
+		profile.UserSid = acc.Sid
 		listProfile = append(listProfile, &profile)
 	}
 	return listProfile, nil
