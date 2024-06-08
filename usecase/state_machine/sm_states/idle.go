@@ -20,7 +20,7 @@ func NewIdleState(fn FireFn) StateHandler {
 func (s *StateIdle) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	state := procPkg.GetState()
-	state.SetUpCountDown(idleTimeout)
+	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	dispatcher := procPkg.GetDispatcher()
 	if dispatcher == nil {
 		procPkg.GetLogger().Warn("missing dispatcher don't broadcast")

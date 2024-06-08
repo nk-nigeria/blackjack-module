@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 
+	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 )
@@ -23,7 +24,7 @@ func (s *StatePlay) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	state := procPkg.GetState()
 	// Setup count down
-	state.SetUpCountDown(playTimeout)
+	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	procPkg.GetProcessor().NotifyUpdateGameState(
 		state,
 		procPkg.GetLogger(),

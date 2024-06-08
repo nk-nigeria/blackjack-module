@@ -2,7 +2,6 @@ package smstates
 
 import (
 	"context"
-	"time"
 
 	"github.com/qmuntal/stateless"
 )
@@ -15,15 +14,6 @@ const (
 
 	// internal transition
 	TriggerProcess = "TriggerProcess"
-)
-
-const (
-	idleTimeout      = time.Second * 15
-	preparingTimeout = time.Second * 12
-	playTimeout      = time.Second * 12
-	//playTimeout      = time.Second * 10
-	rewardTimeout = time.Second * 10
-	//rewardTimeout    = time.Second * 10
 )
 
 type StateHandler interface {

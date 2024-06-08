@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 
+	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 )
@@ -22,7 +23,7 @@ func (s *StateReward) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg.GetLogger().Info("[reward] enter")
 	// setup reward timeout
 	state := procPkg.GetState()
-	state.SetUpCountDown(rewardTimeout)
+	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	procPkg.GetProcessor().NotifyUpdateGameState(
 		state,
 		procPkg.GetLogger(),

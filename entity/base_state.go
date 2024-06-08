@@ -9,18 +9,12 @@ import (
 	"github.com/emirpasic/gods/maps/linkedhashmap"
 	"github.com/heroiclabs/nakama-common/runtime"
 
+	"github.com/ciaolink-game-platform/cgp-common/define"
+	"github.com/ciaolink-game-platform/cgp-common/lib"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 )
 
-// type MatchLabel struct {
-// 	Open         int32  `json:"open"`
-// 	Bet          int32  `json:"bet"`
-// 	Code         string `json:"code"`
-// 	Name         string `json:"name"`
-// 	Password     string `json:"password"`
-// 	MaxSize      int32  `json:"max_size"`
-// 	MockCodeCard int32  `json:"mock_code_card"`
-// }
+var GameStateDuration = lib.GetGameStateDurationByGameCode(define.DragontigerName)
 
 type baseMatchState struct {
 	Label               *pb.Match

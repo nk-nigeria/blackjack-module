@@ -3,8 +3,8 @@ package smstates
 import (
 	"context"
 	"strings"
-	"time"
 
+	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
 )
 
@@ -22,7 +22,7 @@ func (s *StateMatching) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	procPkg.GetLogger().Info("[matching] enter")
 	state := procPkg.GetState()
-	state.SetUpCountDown(1 * time.Second)
+	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	procPkg.GetLogger().Info("apply leave presence")
 	listPrecense := state.GetPresenceNotInteract(1)
 	if len(listPrecense) > 0 {

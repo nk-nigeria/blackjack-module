@@ -5,6 +5,7 @@ import (
 	"math"
 	"strings"
 
+	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 )
@@ -24,7 +25,7 @@ func (s *StatePreparing) Enter(ctx context.Context, _ ...interface{}) error {
 	state.SetAllowBet(true)
 	state.InitUserBet()
 	procPkg.GetLogger().Info("state %v", state.Presences)
-	state.SetUpCountDown(preparingTimeout)
+	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	// remove all user not interact 2 game conti
 	listPrecense := state.GetPresenceNotInteract(1)
 	if len(listPrecense) > 0 {
