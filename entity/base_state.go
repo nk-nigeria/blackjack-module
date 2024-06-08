@@ -14,7 +14,7 @@ import (
 	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 )
 
-var GameStateDuration = lib.GetGameStateDurationByGameCode(define.BandarqqName)
+var GameStateDuration = lib.GetGameStateDurationByGameCode(define.BlackjackName)
 
 type baseMatchState struct {
 	Label               *pb.Match
