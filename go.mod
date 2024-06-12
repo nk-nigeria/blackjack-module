@@ -6,7 +6,7 @@ toolchain go1.21.4
 
 require (
 	github.com/bwmarrin/snowflake v0.3.0
-	github.com/ciaolink-game-platform/cgp-common v0.0.0-20240608092349-3b077e3544c5
+	github.com/ciaolink-game-platform/cgp-common v0.0.0-20240612031229-f71a91fe0dfd
 	github.com/emirpasic/gods v1.18.1
 	github.com/heroiclabs/nakama-common v1.30.0
 	github.com/jackc/pgtype v1.14.0

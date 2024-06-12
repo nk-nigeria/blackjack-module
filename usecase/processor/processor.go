@@ -667,20 +667,25 @@ func (p *Processor) calcRewardForUserPlaying(
 	balanceResult := pb.BalanceResult{}
 	listFeeGame := make([]entity.FeeGame, 0)
 	for _, betResult := range updateFinish.BetResults {
+
 		balance := &pb.BalanceUpdate{
 			UserId:           betResult.UserId,
 			AmountChipBefore: mapUserWallet[betResult.UserId].Chips,
 		}
-		balance.AmountChipAdd = betResult.First.Total + betResult.Second.Total + betResult.Insurance.Total
-		if balance.AmountChipAdd > 0 {
+		balance.AmoutChipBet = betResult.First.BetAmount + betResult.Second.BetAmount + betResult.Insurance.BetAmount
+		chipWin := betResult.First.Total + betResult.Second.Total + betResult.Insurance.Total
+		balance.TotalChipInMatch = -balance.AmoutChipBet
+		if chipWin > 0 {
 			fee := int64(0)
 			presence, ok := s.GetPresence(betResult.UserId).(entity.MyPrecense)
 			percentFeeGame := entity.GetFeeGameByLevel(0)
 			if ok {
 				percentFeeGame = entity.GetFeeGameByLevel(int(presence.VipLevel))
 			}
-			fee = balance.AmountChipAdd / 100 * int64(percentFeeGame)
-			balance.AmountChipCurrent = balance.AmountChipBefore + balance.AmountChipAdd - fee
+			fee = chipWin / 100 * int64(percentFeeGame)
+			balance.AmountChipAdd = chipWin - fee
+			balance.TotalChipInMatch += balance.AmountChipAdd
+			balance.AmountChipCurrent = balance.AmountChipBefore + balance.AmountChipAdd
 			listFeeGame = append(listFeeGame, entity.FeeGame{
 				UserID: balance.UserId,
 				Fee:    fee,
