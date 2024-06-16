@@ -117,6 +117,11 @@ func (s *MatchState) IsGameEnded() bool     { return s.isGameEnded }
 func (s *MatchState) GetPlayerHand(userId string) *pb.BlackjackPlayerHand {
 	return s.userHands[userId].ToPb()
 }
+
+func (s *MatchState) PlayerHand(userId string) *Hand {
+	return s.userHands[userId]
+}
+
 func (s *MatchState) GetPlayerPartOfHand(userId string, pos pb.BlackjackHandN0) *pb.BlackjackHand {
 	if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
 		return s.userHands[userId].ToPb().First
@@ -127,6 +132,10 @@ func (s *MatchState) GetPlayerPartOfHand(userId string, pos pb.BlackjackHandN0) 
 
 func (s *MatchState) GetDealerHand() *pb.BlackjackPlayerHand {
 	return s.dealerHand.ToPb()
+}
+
+func (s *MatchState) DealerHand() *Hand {
+	return s.dealerHand
 }
 
 func (s *MatchState) AddCards(cards []*pb.Card, userId string, handN0 pb.BlackjackHandN0) {
@@ -368,7 +377,7 @@ func (s *MatchState) getPlayerBetResult(userId string) *pb.BlackjackPLayerBetRes
 	// meaning that currently in insurance round
 	if insurance.BetAmount > 0 {
 		// case win bet -> game also ended
-		if _, dt := s.dealerHand.Eval(1); dt == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK {
+		if _, _, dt := s.dealerHand.Eval(1); dt == pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK {
 			insurance.WinAmount = insurance.BetAmount * 2
 			insurance.Total = insurance.BetAmount + insurance.WinAmount
 			insurance.IsWin = 1

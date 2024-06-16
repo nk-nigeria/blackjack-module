@@ -65,7 +65,7 @@ func (p *Processor) ProcessNewGame(
 		s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	}
 	// for {
-	cards := p.engine.Deal(2)
+	// 	cards := p.engine.Deal(2)
 	// 	hasRankA := false
 	// 	if len(cards) > 1 && cards[0].Rank == pb.CardRank_RANK_A {
 	// 		hasRankA = true
@@ -73,9 +73,10 @@ func (p *Processor) ProcessNewGame(
 	// 	if !hasRankA {
 	// 		continue
 	// 	}
-	s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	// 	s.AddCards(cards, listPlayerId[0], pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	// 	break
 	// }
+	s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	p.notifyInitialDealCard(
 		ctx, nk, logger, dispatcher, s,
 	)
@@ -546,10 +547,17 @@ func (p *Processor) notifyUpdateBet(
 			ErrorType: pb.ErrorType_ERROR_TYPE_UNSPECIFIED,
 		}
 	}
-	if wallet.Chips-chip <= 0 {
+	if wallet.Chips-chip < 0 {
 		p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, userId)
 		return
 	}
+	balance := &pb.BalanceUpdate{
+		UserId:            userId,
+		AmountChipBefore:  wallet.Chips,
+		AmountChipAdd:     -chip,
+		AmountChipCurrent: wallet.Chips - chip,
+	}
+	updateDesk.Bet.Balance = balance
 	// logger.WithField("user-id", userId).Info("update-bet")
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
@@ -558,18 +566,7 @@ func (p *Processor) notifyUpdateBet(
 	if updateDesk.Error != nil {
 		return
 	}
-	p.updateChipByResultGameFinish(
-		ctx, nk, logger, &pb.BalanceResult{
-			Updates: []*pb.BalanceUpdate{
-				{
-					UserId:            userId,
-					AmountChipBefore:  wallet.Chips,
-					AmountChipAdd:     -chip,
-					AmountChipCurrent: wallet.Chips - chip,
-				},
-			},
-		},
-	)
+	p.updateChipByResultGameFinish(ctx, nk, logger, &pb.BalanceResult{Updates: []*pb.BalanceUpdate{balance}})
 }
 
 func (p *Processor) notifyNotEnoughChip(
@@ -610,7 +607,7 @@ func (p *Processor) updateChipByResultGameFinish(
 ) {
 	walletUpdates := make([]*runtime.WalletUpdate, 0, len(balanceResult.Updates))
 	for _, update := range balanceResult.Updates {
-		amountChip := update.AmountChipCurrent - update.AmountChipBefore
+		amountChip := update.AmountChipAdd
 		changeset := map[string]int64{
 			"chips": amountChip,
 		}
@@ -818,6 +815,7 @@ func (p *Processor) notifyDealCard(
 	} else {
 		hand = hands.Second
 	}
+
 	msg := &pb.BlackjackUpdateDeal{
 		UserId:                   userId,
 		IsBanker:                 isBanker,
