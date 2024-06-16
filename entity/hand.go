@@ -1,6 +1,10 @@
 package entity
 
-import pb "github.com/ciaolink-game-platform/cgp-common/proto"
+import (
+	"strconv"
+
+	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+)
 
 type Hand struct {
 	userId string
@@ -25,19 +29,21 @@ func NewHandFromPb(v *pb.BlackjackPlayerHand) *Hand {
 }
 
 func (h *Hand) ToPb() *pb.BlackjackPlayerHand {
-	point1, hand1Type := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-	point2, hand2Type := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+	point1, pointAce1, hand1Type := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	point2, pointAce2, hand2Type := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 	return &pb.BlackjackPlayerHand{
 		UserId: h.userId,
 		First: &pb.BlackjackHand{
-			Cards: h.first,
-			Point: point1,
-			Type:  hand1Type,
+			Cards:      h.first,
+			Point:      point1,
+			Type:       hand1Type,
+			PointCardA: pointAce1,
 		},
 		Second: &pb.BlackjackHand{
-			Cards: h.second,
-			Point: point2,
-			Type:  hand2Type,
+			Cards:      h.second,
+			Point:      point2,
+			Type:       hand2Type,
+			PointCardA: pointAce2,
 		},
 	}
 }
@@ -51,10 +57,11 @@ func getCardPoint(r pb.CardRank) int32 {
 	}
 }
 
-func calculatePoint(cards []*pb.Card) int32 {
+func calculatePoint(cards []*pb.Card) (int32, string) {
 	if cards == nil {
-		return 0
+		return 0, ""
 	}
+	pointAce := ""
 	haveAce := false
 	point := int32(0)
 	for _, c := range cards {
@@ -64,38 +71,49 @@ func calculatePoint(cards []*pb.Card) int32 {
 		}
 		point += v
 	}
-	if haveAce && point <= 11 {
-		point += 10
+	if haveAce {
+
+		pointAce = strconv.Itoa(int(point))
+		if point <= 11 {
+			point += 10
+			pointAce += "/" + strconv.Itoa(int(point))
+		}
+		// blackjack
+		if len(cards) == 2 && point == 21 {
+			pointAce = ""
+		}
 	}
-	return point
+	return point, pointAce
 }
 
 // Eval(1) if want to evaluate 1st hand, any else for 2nd hand
-func (h *Hand) Eval(pos pb.BlackjackHandN0) (int32, pb.BlackjackHandType) {
+func (h *Hand) Eval(pos pb.BlackjackHandN0) (int32, string, pb.BlackjackHandType) {
 	point := int32(0)
+	pointAce := ""
 	if pos == 1 {
-		point = calculatePoint(h.first)
+		point, pointAce = calculatePoint(h.first)
 	} else {
-		point = calculatePoint(h.second)
+		point, pointAce = calculatePoint(h.second)
 	}
 	if point == 0 {
-		return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
+		return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
 	}
 	if point == 21 {
 		if pos == 1 && len(h.first) == 2 && len(h.second) == 0 {
-			return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK
+			return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK
 		} else {
-			return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P
+			return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P
 		}
 	} else if point > 21 {
-		return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED
+		return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED
 	}
-	return point, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL
+	return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL
 }
 
 // Dealer must draw on lower than 17 and stand on >= 17
 func (h *Hand) DealerMustDraw() bool {
-	return calculatePoint(h.first) < 17
+	point, _ := calculatePoint(h.first)
+	return point < 17
 }
 
 func (h *Hand) DealerPotentialBlackjack() bool {
@@ -104,11 +122,13 @@ func (h *Hand) DealerPotentialBlackjack() bool {
 
 // Check if player can draw on current hand, call with pos=1 for 1st hand, else 2nd hand
 func (h *Hand) PlayerCanDraw(pos pb.BlackjackHandN0) bool {
+	point := int32(0)
 	if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
-		return calculatePoint(h.first) < 21
+		point, _ = calculatePoint(h.first)
 	} else {
-		return calculatePoint(h.second) < 21
+		point, _ = calculatePoint(h.second)
 	}
+	return point < 21
 }
 
 func (h *Hand) PlayerCanSplit() bool {
@@ -139,9 +159,9 @@ func (h *Hand) AddCards(c []*pb.Card, pos pb.BlackjackHandN0) {
 
 // comparing player hand with dealer hand, -1 -> lost, 1 -> win, 0 -> tie
 func (h *Hand) Compare(d *Hand) (int, int) {
-	hp1, ht1 := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-	hp2, ht2 := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-	dp, dt := d.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	hp1, _, ht1 := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	hp2, _, ht2 := h.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+	dp, _, dt := d.Eval(pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	r1 := 0
 	r2 := 0
 	if ht1 != pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED {
