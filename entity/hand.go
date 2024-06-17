@@ -69,7 +69,7 @@ type CPoint struct {
 
 func calculatePoint(cards []*pb.Card) (*CPoint, string) {
 	if cards == nil {
-		return nil, ""
+		return &CPoint{}, ""
 	}
 	pointAce := ""
 	haveAce := false
