@@ -111,6 +111,7 @@ func (p *Processor) ProcessNewGame(
 
 	p.turnBaseEngine.SetCurrentRound("bet")
 	p.turnBaseEngine.SetCurrentPlayer(listPlayerId[0])
+	time.Sleep(1500 * time.Millisecond)
 }
 
 func (p *Processor) ProcessFinishGame(ctx context.Context,
