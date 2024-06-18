@@ -558,6 +558,7 @@ func (p *Processor) notifyUpdateBet(
 		AmountChipBefore:  wallet.Chips,
 		AmountChipAdd:     -chip,
 		AmountChipCurrent: wallet.Chips - chip,
+		AmoutChipBet:      chip,
 	}
 	updateDesk.Bet.Balance = balance
 	// logger.WithField("user-id", userId).Info("update-bet")
