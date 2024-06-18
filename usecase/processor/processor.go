@@ -64,25 +64,27 @@ func (p *Processor) ProcessNewGame(
 		listPlayerId = append(listPlayerId, presence.GetUserId())
 		s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	}
-	// for {
-	// 	cards := p.engine.Deal(2)
-	// 	hasRankA := false
-	// 	if len(cards) > 1 && cards[0].Rank == pb.CardRank_RANK_A {
-	// 		hasRankA = true
-	// 	}
-	// 	if !hasRankA {
-	// 		continue
-	// 	}
-	// 	s.AddCards(cards, listPlayerId[0], pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-	// 	break
-	// }
-	s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	for {
+		cards := p.engine.Deal(2)
+		hasRankA := false
+		if len(cards) > 1 && cards[0].Rank == pb.CardRank_RANK_A {
+			hasRankA = true
+		}
+		if !hasRankA {
+			continue
+		}
+		s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+		break
+	}
+	// s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	p.notifyInitialDealCard(
 		ctx, nk, logger, dispatcher, s,
 	)
 	if p.turnBaseEngine == nil {
 		p.turnBaseEngine = NewTurnBaseEngine()
 	}
+	time.Sleep(2500 * time.Millisecond)
+
 	p.turnBaseEngine.Config(
 		listPlayerId,
 		[]*Round{
@@ -556,6 +558,7 @@ func (p *Processor) notifyUpdateBet(
 		AmountChipBefore:  wallet.Chips,
 		AmountChipAdd:     -chip,
 		AmountChipCurrent: wallet.Chips - chip,
+		AmoutChipBet:      chip,
 	}
 	updateDesk.Bet.Balance = balance
 	// logger.WithField("user-id", userId).Info("update-bet")

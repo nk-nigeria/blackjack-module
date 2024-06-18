@@ -35,15 +35,19 @@ func (h *Hand) ToPb() *pb.BlackjackPlayerHand {
 		UserId: h.userId,
 		First: &pb.BlackjackHand{
 			Cards:      h.first,
-			Point:      point1,
+			Point:      int32(point1.Point),
 			Type:       hand1Type,
 			PointCardA: pointAce1,
+			MinPoint:   int32(point1.MinPoint),
+			MaxPoint:   int32(point1.MaxPoint),
 		},
 		Second: &pb.BlackjackHand{
 			Cards:      h.second,
-			Point:      point2,
+			Point:      int32(point2.Point),
 			Type:       hand2Type,
 			PointCardA: pointAce2,
+			MinPoint:   int32(point2.MinPoint),
+			MaxPoint:   int32(point2.MaxPoint),
 		},
 	}
 }
@@ -57,13 +61,20 @@ func getCardPoint(r pb.CardRank) int32 {
 	}
 }
 
-func calculatePoint(cards []*pb.Card) (int32, string) {
+type CPoint struct {
+	Point    int
+	MinPoint int
+	MaxPoint int
+}
+
+func calculatePoint(cards []*pb.Card) (*CPoint, string) {
 	if cards == nil {
-		return 0, ""
+		return &CPoint{}, ""
 	}
 	pointAce := ""
 	haveAce := false
 	point := int32(0)
+	cPoint := &CPoint{}
 	for _, c := range cards {
 		v := getCardPoint(c.Rank)
 		if v == 1 {
@@ -71,8 +82,8 @@ func calculatePoint(cards []*pb.Card) (int32, string) {
 		}
 		point += v
 	}
+	cPoint.MinPoint = int(point)
 	if haveAce {
-
 		pointAce = strconv.Itoa(int(point))
 		if point <= 11 {
 			point += 10
@@ -82,29 +93,33 @@ func calculatePoint(cards []*pb.Card) (int32, string) {
 		if len(cards) == 2 && point == 21 {
 			pointAce = ""
 		}
+		cPoint.MaxPoint = int(point)
+	} else {
+		pointAce = strconv.Itoa(int(point))
 	}
-	return point, pointAce
+	cPoint.Point = int(point)
+	return cPoint, pointAce
 }
 
 // Eval(1) if want to evaluate 1st hand, any else for 2nd hand
-func (h *Hand) Eval(pos pb.BlackjackHandN0) (int32, string, pb.BlackjackHandType) {
-	point := int32(0)
+func (h *Hand) Eval(pos pb.BlackjackHandN0) (*CPoint, string, pb.BlackjackHandType) {
+	var point *CPoint
 	pointAce := ""
 	if pos == 1 {
 		point, pointAce = calculatePoint(h.first)
 	} else {
 		point, pointAce = calculatePoint(h.second)
 	}
-	if point == 0 {
+	if point.Point == 0 {
 		return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_UNSPECIFIED
 	}
-	if point == 21 {
+	if point.Point == 21 {
 		if pos == 1 && len(h.first) == 2 && len(h.second) == 0 {
 			return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BLACKJACK
 		} else {
 			return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P
 		}
-	} else if point > 21 {
+	} else if point.Point > 21 {
 		return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_BUSTED
 	}
 	return point, pointAce, pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL
@@ -113,7 +128,7 @@ func (h *Hand) Eval(pos pb.BlackjackHandN0) (int32, string, pb.BlackjackHandType
 // Dealer must draw on lower than 17 and stand on >= 17
 func (h *Hand) DealerMustDraw() bool {
 	point, _ := calculatePoint(h.first)
-	return point < 17
+	return point.Point < 17
 }
 
 func (h *Hand) DealerPotentialBlackjack() bool {
@@ -122,13 +137,13 @@ func (h *Hand) DealerPotentialBlackjack() bool {
 
 // Check if player can draw on current hand, call with pos=1 for 1st hand, else 2nd hand
 func (h *Hand) PlayerCanDraw(pos pb.BlackjackHandN0) bool {
-	point := int32(0)
+	var point *CPoint
 	if pos == pb.BlackjackHandN0_BLACKJACK_HAND_1ST {
 		point, _ = calculatePoint(h.first)
 	} else {
 		point, _ = calculatePoint(h.second)
 	}
-	return point < 21
+	return point.Point < 21
 }
 
 func (h *Hand) PlayerCanSplit() bool {
@@ -171,9 +186,9 @@ func (h *Hand) Compare(d *Hand) (int, int) {
 			if int(ht1) > int(dt) {
 				r1 = 1
 			} else if int(ht1) == int(dt) {
-				if hp1 > dp {
+				if hp1.Point > dp.Point {
 					r1 = 1
-				} else if hp1 < dp {
+				} else if hp1.Point < dp.Point {
 					r1 = -1
 				}
 			} else {
@@ -188,9 +203,9 @@ func (h *Hand) Compare(d *Hand) (int, int) {
 			if int(ht2) > int(dt) {
 				r2 = 1
 			} else if int(ht2) == int(dt) {
-				if hp2 > dp {
+				if hp2.Point > dp.Point {
 					r2 = 1
-				} else if hp2 < dp {
+				} else if hp2.Point < dp.Point {
 					r2 = -1
 				}
 			} else {
