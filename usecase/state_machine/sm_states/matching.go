@@ -64,6 +64,7 @@ func (s *StateMatching) Process(ctx context.Context, args ...interface{}) error 
 	if remain > 0 {
 		return nil
 	}
+
 	if state.IsEnoughPlayer() {
 		s.Trigger(ctx, TriggerStateFinishSuccess)
 	} else {
