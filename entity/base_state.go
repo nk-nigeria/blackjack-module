@@ -60,6 +60,18 @@ func (s *baseMatchState) IsReadyToPlay() bool { return s.Presences.Size() >= s.M
 
 func (s *baseMatchState) GetPresenceSize() int { return s.Presences.Size() }
 
+func (s *baseMatchState) GetPresenceNotBotSize() int {
+	count := 0
+	s.Presences.Each(func(index any, value interface{}) {
+		_, ok := value.(runtime.Presence)
+		if !ok {
+			return
+		}
+		count++
+	})
+	return count
+}
+
 func (s *baseMatchState) AddPresence(ctx context.Context,
 	db *sql.DB,
 	presences []runtime.Presence,

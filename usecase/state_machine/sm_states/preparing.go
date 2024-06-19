@@ -67,6 +67,10 @@ func (s *StatePreparing) Process(ctx context.Context, args ...interface{}) error
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	state := procPkg.GetState()
 	remain := state.GetRemainCountDown()
+	if state.GetPresenceNotBotSize() == 0 {
+		s.Trigger(ctx, TriggerStateFinishFailed)
+		return nil
+	}
 	message := procPkg.GetMessages()
 	if len(message) > 0 {
 		procPkg.GetProcessor().ProcessMessageFromUser(ctx,

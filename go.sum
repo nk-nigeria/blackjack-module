@@ -4,8 +4,8 @@ github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLj
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/bwmarrin/snowflake v0.3.0 h1:xm67bEhkKh6ij1790JB83OujPR5CzNe8QuQqAgISZN0=
 github.com/bwmarrin/snowflake v0.3.0/go.mod h1:NdZxfVWX+oR6y2K0o6qAYv6gIOP9rjG0/E9WsDpxqwE=
-github.com/ciaolink-game-platform/cgp-common v0.0.0-20240617145015-b4506b3b82a8 h1:ZfYXid4oDc8ezBt1Lbmvwoyq6R0H6LQHugI5YPanYhI=
-github.com/ciaolink-game-platform/cgp-common v0.0.0-20240617145015-b4506b3b82a8/go.mod h1:oeyyErMYJbu+1J9t/z7ZzmRHdw/n+Do+iJ33EZR5rh8=
+github.com/ciaolink-game-platform/cgp-common v0.0.0-20240618155617-3969fde51981 h1:4vZVJ6bDUHWheuFs/1RC90E6U88j0EPaA4QvU9UaXVU=
+github.com/ciaolink-game-platform/cgp-common v0.0.0-20240618155617-3969fde51981/go.mod h1:oeyyErMYJbu+1J9t/z7ZzmRHdw/n+Do+iJ33EZR5rh8=
 github.com/cockroachdb/apd v1.1.0/go.mod h1:8Sl8LxpKi29FqWXR16WEFZRNSz3SoPzUzeMeY4+DwBQ=
 github.com/coreos/go-systemd v0.0.0-20190321100706-95778dfbb74e/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
 github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f/go.mod h1:F5haX7vjVVG0kc13fIWeqUViNPyEJxv/OmvnBo0Yme4=
