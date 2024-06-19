@@ -195,13 +195,13 @@ func (p *Processor) ProcessTurnbase(ctx context.Context,
 						if bet.Insurance > 0 {
 							bet.Insurance = 0
 							s.SetUserBetById(presence.GetUserId(), bet)
-							p.broadcastMessage(
-								logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
-								&pb.BlackjackUpdateDesk{
-									IsUpdateBet: true,
-									Bet:         bet,
-								}, nil, nil, true,
-							)
+							// 		p.broadcastMessage(
+							// 			logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
+							// 			&pb.BlackjackUpdateDesk{
+							// 				IsUpdateBet: true,
+							// 				// Bet:         bet,
+							// 			}, nil, nil, true,
+							// 		)
 						}
 					}
 				}
@@ -312,25 +312,46 @@ func (p *Processor) ProcessMessageFromUser(
 			if err := p.unmarshaler.Unmarshal(message.GetData(), action); err != nil {
 				logger.Error("error.parse-action from [%s]", err.Error())
 				continue
-			} else {
-				s.ResetUserNotInteract(message.GetUserId())
-				wallet, err := entity.ReadWalletUser(ctx, nk, logger, action.UserId)
-				if err != nil {
-					logger.Error("error.read-wallet %v", err.Error())
+			}
+			s.ResetUserNotInteract(message.GetUserId())
+			wallet, err := entity.ReadWalletUser(ctx, nk, logger, action.UserId)
+			if err != nil {
+				logger.Error("error.read-wallet %v", err.Error())
+				continue
+			}
+			action.UserId = message.GetUserId()
+			switch action.Code {
+			case pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE:
+				if !s.IsAllowAction() {
 					continue
 				}
-				action.UserId = message.GetUserId()
-				switch action.Code {
-				case pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE:
-					if !s.IsAllowAction() {
-						continue
-					}
-					if !s.IsCanDoubleDownBet(action.UserId, wallet.Chips, s.GetCurrentHandN0(action.UserId)) {
-						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
-						continue
-					}
-					chip := s.DoubleDownBet(action.UserId, s.GetCurrentHandN0(action.UserId))
-					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
+				if !s.IsCanDoubleDownBet(action.UserId, wallet.Chips, s.GetCurrentHandN0(action.UserId)) {
+					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
+					continue
+				}
+				chip := s.DoubleDownBet(action.UserId, s.GetCurrentHandN0(action.UserId))
+				p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
+				cards := p.engine.Deal(1)
+				s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
+				p.broadcastMessage(
+					logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
+					&pb.BlackjackUpdateDeal{
+						IsBanker:                 false,
+						IsRevealBankerHiddenCard: false,
+						UserId:                   action.UserId,
+						HandN0:                   s.GetCurrentHandN0(action.UserId),
+						NewCards:                 cards,
+						Hand:                     s.GetPlayerHand(action.UserId),
+					}, nil, nil, true,
+				)
+				if s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+					s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+					p.turnBaseEngine.RePhase()
+				} else {
+					p.turnBaseEngine.NextPhase()
+				}
+			case pb.BlackjackActionCode_BLACKJACK_ACTION_HIT:
+				if s.IsAllowAction() && s.IsCanHit(action.UserId, s.GetCurrentHandN0(action.UserId)) {
 					cards := p.engine.Deal(1)
 					s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
 					p.broadcastMessage(
@@ -344,87 +365,65 @@ func (p *Processor) ProcessMessageFromUser(
 							Hand:                     s.GetPlayerHand(action.UserId),
 						}, nil, nil, true,
 					)
-					if s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
-						s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-						p.turnBaseEngine.RePhase()
-					} else {
-						p.turnBaseEngine.NextPhase()
-					}
-				case pb.BlackjackActionCode_BLACKJACK_ACTION_HIT:
-					if s.IsAllowAction() && s.IsCanHit(action.UserId, s.GetCurrentHandN0(action.UserId)) {
-						cards := p.engine.Deal(1)
-						s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
-						p.broadcastMessage(
-							logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_DEAL),
-							&pb.BlackjackUpdateDeal{
-								IsBanker:                 false,
-								IsRevealBankerHiddenCard: false,
-								UserId:                   action.UserId,
-								HandN0:                   s.GetCurrentHandN0(action.UserId),
-								NewCards:                 cards,
-								Hand:                     s.GetPlayerHand(action.UserId),
-							}, nil, nil, true,
-						)
-						// after that hit, player can't hit anymore -> next hand if possible else next turn
-						if !s.IsCanHit(action.UserId, s.GetCurrentHandN0(action.UserId)) {
-							if s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
-								s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-								p.turnBaseEngine.RePhase()
-							} else {
-								p.turnBaseEngine.NextPhase()
-							}
-						} else {
+					// after that hit, player can't hit anymore -> next hand if possible else next turn
+					if !s.IsCanHit(action.UserId, s.GetCurrentHandN0(action.UserId)) {
+						if s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+							s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 							p.turnBaseEngine.RePhase()
+						} else {
+							p.turnBaseEngine.NextPhase()
 						}
-					}
-				case pb.BlackjackActionCode_BLACKJACK_ACTION_INSURANCE:
-					if !s.IsAllowInsurance() {
-						logger.WithField("user_id", message.GetUserId()).Info("not allow insurance")
-						continue
-					}
-					if s.IsCanInsuranceBet(action.UserId, wallet.Chips) {
-						chip := s.InsuranceBet(action.UserId)
-						p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED) // unspecified mean its not in any of 2 hands slot -> insurance slot
 					} else {
-						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
-					}
-				case pb.BlackjackActionCode_BLACKJACK_ACTION_STAY:
-					if s.IsAllowAction() && s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
-						s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
 						p.turnBaseEngine.RePhase()
-						logger.Info("SWITCH TO 2ND HAND, ACTION_STAY")
-					} else {
-						p.turnBaseEngine.NextPhase()
-						logger.Info("SWITCH TO NEXT PHASE, ACTION_STAY")
 					}
-				case pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT:
-					if !s.IsAllowAction() {
-						continue
-					}
-					allow, enoughChip := s.IsCanSplitHand(action.UserId, wallet.Chips)
-					if !enoughChip {
-						p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
-						continue
-					}
-					if !allow {
-						continue
-					}
-					chip := s.SplitHand(action.UserId)
-					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
-					p.broadcastMessage(
-						logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
-						&pb.BlackjackUpdateDesk{
-							IsSplitHand: true,
-							Hand:        s.GetPlayerHand(action.UserId),
-						}, nil, nil, true,
-					)
-					cards := p.engine.Deal(2)
-					s.AddCards([]*pb.Card{cards[0]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-					p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-					s.AddCards([]*pb.Card{cards[1]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-					p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
-					p.turnBaseEngine.RePhase()
 				}
+			case pb.BlackjackActionCode_BLACKJACK_ACTION_INSURANCE:
+				if !s.IsAllowInsurance() {
+					logger.WithField("user_id", message.GetUserId()).Info("not allow insurance")
+					continue
+				}
+				if s.IsCanInsuranceBet(action.UserId, wallet.Chips) {
+					chip := s.InsuranceBet(action.UserId)
+					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED) // unspecified mean its not in any of 2 hands slot -> insurance slot
+				} else {
+					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
+				}
+			case pb.BlackjackActionCode_BLACKJACK_ACTION_STAY:
+				if s.IsAllowAction() && s.GetCurrentHandN0(action.UserId) == pb.BlackjackHandN0_BLACKJACK_HAND_1ST && len(s.GetPlayerPartOfHand(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND).Cards) == 2 {
+					s.SetCurrentHandN0(action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+					p.turnBaseEngine.RePhase()
+					logger.Info("SWITCH TO 2ND HAND, ACTION_STAY")
+				} else {
+					p.turnBaseEngine.NextPhase()
+					logger.Info("SWITCH TO NEXT PHASE, ACTION_STAY")
+				}
+			case pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT:
+				if !s.IsAllowAction() {
+					continue
+				}
+				allow, enoughChip := s.IsCanSplitHand(action.UserId, wallet.Chips)
+				if !enoughChip {
+					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
+					continue
+				}
+				if !allow {
+					continue
+				}
+				chip := s.SplitHand(action.UserId)
+				p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
+				p.broadcastMessage(
+					logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
+					&pb.BlackjackUpdateDesk{
+						IsSplitHand: true,
+						Hand:        s.GetPlayerHand(action.UserId),
+					}, nil, nil, true,
+				)
+				cards := p.engine.Deal(2)
+				s.AddCards([]*pb.Card{cards[0]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+				p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+				s.AddCards([]*pb.Card{cards[1]}, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+				p.notifyDealCard(ctx, nk, logger, dispatcher, s, action.UserId, pb.BlackjackHandN0_BLACKJACK_HAND_2ND)
+				p.turnBaseEngine.RePhase()
 			}
 		case pb.OpCodeRequest_OPCODE_REQUEST_INFO_TABLE:
 			p.broadcastMessage(

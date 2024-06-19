@@ -83,6 +83,7 @@ func calculatePoint(cards []*pb.Card) (*CPoint, string) {
 		point += v
 	}
 	cPoint.MinPoint = int(point)
+	cPoint.MaxPoint = int(point)
 	if haveAce {
 		pointAce = strconv.Itoa(int(point))
 		if point <= 11 {
