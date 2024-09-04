@@ -4,8 +4,8 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/nakamaFramework/blackjack-module/entity"
 )
 
 type IProcessor interface {

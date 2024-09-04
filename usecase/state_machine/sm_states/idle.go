@@ -3,8 +3,8 @@ package smstates
 import (
 	"context"
 
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
-	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
+	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nakamaFramework/blackjack-module/pkg/packager"
 )
 
 type StateIdle struct {

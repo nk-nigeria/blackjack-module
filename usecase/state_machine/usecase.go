@@ -3,7 +3,7 @@ package state_machine
 import (
 	"context"
 
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 	"github.com/qmuntal/stateless"
 )
 

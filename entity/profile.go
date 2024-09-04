@@ -7,9 +7,9 @@ import (
 	"errors"
 	"strings"
 
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 	"github.com/heroiclabs/nakama-common/api"
 	"github.com/jackc/pgtype"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

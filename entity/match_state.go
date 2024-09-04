@@ -1,9 +1,9 @@
 package entity
 
 import (
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 	"github.com/emirpasic/gods/maps/linkedhashmap"
 	"github.com/heroiclabs/nakama-common/runtime"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 )
 
 const (

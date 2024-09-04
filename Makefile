@@ -1,19 +1,23 @@
-PROJECT_NAME=github.com/ciaolink-game-platform/blackjack-module
+PROJECT_NAME=github.com/nakamaFramework/blackjack-module
 APP_NAME=blackjack.so
 APP_PATH=$(PWD)
 NAKAMA_VER=3.19.0
+
 update-submodule-dev:
 	git checkout develop && git pull
 	git submodule update --init
 	git submodule update --remote
 	cd ./cgp-common && git checkout develop && git pull && cd ..
-	go get github.com/ciaolink-game-platform/cgp-common@develop
+	go get github.com/nakamaFramework/cgp-common@develop
 update-submodule-stg:
 	git checkout staging && git pull
 	git submodule update --init
 	git submodule update --remote
 	cd ./cgp-common && git checkout staging && cd ..
-	go get github.com/ciaolink-game-platform/cgp-common@staging
+	go get github.com/nakamaFramework/cgp-common@staging
+
+cpdev:
+	scp ./bin/${APP_NAME} nakama:/root/cgp-server-dev/dist/data/modules/
 
 build:
 	# ./sync_pkg_3.11.sh
