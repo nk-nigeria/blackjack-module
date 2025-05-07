@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/ciaolink-game-platform/blackjack-module/api"
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/nakamaFramework/blackjack-module/api"
+	"github.com/nakamaFramework/blackjack-module/entity"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

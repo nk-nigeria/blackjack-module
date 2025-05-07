@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ciaolink-game-platform/cgp-common/bot"
-	"github.com/ciaolink-game-platform/cgp-common/lib"
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	"github.com/nakamaFramework/cgp-common/bot"
+	"github.com/nakamaFramework/cgp-common/lib"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
-	"github.com/ciaolink-game-platform/blackjack-module/usecase/engine"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nakamaFramework/blackjack-module/usecase/engine"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

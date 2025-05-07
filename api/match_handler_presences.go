@@ -4,10 +4,10 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
-	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
-	"github.com/ciaolink-game-platform/blackjack-module/usecase/state_machine"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nakamaFramework/blackjack-module/pkg/packager"
+	"github.com/nakamaFramework/blackjack-module/usecase/state_machine"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

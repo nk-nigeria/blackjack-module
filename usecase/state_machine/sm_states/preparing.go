@@ -5,9 +5,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
-	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nakamaFramework/blackjack-module/pkg/packager"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 )
 
 type StatePreparing struct {

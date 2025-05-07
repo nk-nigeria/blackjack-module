@@ -3,11 +3,11 @@ package state_machine
 import (
 	"context"
 
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
-	"github.com/ciaolink-game-platform/blackjack-module/pkg/packager"
-	lib "github.com/ciaolink-game-platform/blackjack-module/usecase/state_machine/sm_states"
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nakamaFramework/blackjack-module/pkg/packager"
+	lib "github.com/nakamaFramework/blackjack-module/usecase/state_machine/sm_states"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 	"github.com/qmuntal/stateless"
 )
 

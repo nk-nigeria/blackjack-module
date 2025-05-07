@@ -9,9 +9,9 @@ import (
 	"github.com/emirpasic/gods/maps/linkedhashmap"
 	"github.com/heroiclabs/nakama-common/runtime"
 
-	"github.com/ciaolink-game-platform/cgp-common/define"
-	"github.com/ciaolink-game-platform/cgp-common/lib"
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	"github.com/nakamaFramework/cgp-common/define"
+	"github.com/nakamaFramework/cgp-common/lib"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 )
 
 var GameStateDuration = lib.GetGameStateDurationByGameCode(define.BlackjackName)

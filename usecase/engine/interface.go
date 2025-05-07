@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"github.com/ciaolink-game-platform/blackjack-module/entity"
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	"github.com/nakamaFramework/blackjack-module/entity"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 	"google.golang.org/protobuf/proto"
 )
 

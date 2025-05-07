@@ -3,8 +3,8 @@ package entity
 import (
 	"strconv"
 
-	"github.com/ciaolink-game-platform/cgp-common/bot"
-	pb "github.com/ciaolink-game-platform/cgp-common/proto"
+	"github.com/nakamaFramework/cgp-common/bot"
+	pb "github.com/nakamaFramework/cgp-common/proto"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 )
