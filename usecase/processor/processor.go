@@ -7,13 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nakamaFramework/cgp-common/bot"
-	"github.com/nakamaFramework/cgp-common/lib"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/cgp-common/bot"
+	"github.com/nk-nigeria/cgp-common/lib"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 
 	"github.com/heroiclabs/nakama-common/runtime"
-	"github.com/nakamaFramework/blackjack-module/entity"
-	"github.com/nakamaFramework/blackjack-module/usecase/engine"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/usecase/engine"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
@@ -300,7 +300,7 @@ func (p *Processor) ProcessMessageFromUser(
 				}
 			}
 		case pb.OpCodeRequest_OPCODE_REQUEST_DECLARE_CARDS:
-			if s.GetGameState() != pb.GameState_GameStatePlay || s.GetCurrentTurn() == "" {
+			if s.GetGameState() != pb.GameState_GAME_STATE_PLAY || s.GetCurrentTurn() == "" {
 				logger.WithField("user-id", message.GetUserId()).Error("current turn is empty")
 				continue
 			}

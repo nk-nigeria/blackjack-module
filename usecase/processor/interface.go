@@ -5,7 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/heroiclabs/nakama-common/runtime"
-	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/entity"
 )
 
 type IProcessor interface {

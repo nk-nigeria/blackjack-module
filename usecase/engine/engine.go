@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"github.com/nakamaFramework/blackjack-module/entity"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -31,7 +31,7 @@ func (m *Engine) Deal(amount int) []*pb.Card {
 
 func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.OpCodeUpdate]proto.Message {
 	messages := make(map[pb.OpCodeUpdate]proto.Message)
-	if s.GetGameState() == pb.GameState_GameStatePlay {
+	if s.GetGameState() == pb.GameState_GAME_STATE_PLAY {
 		hands := []*pb.BlackjackPlayerHand{}
 		dealerHand := &pb.BlackjackPlayerHand{
 			UserId: "",
@@ -73,7 +73,7 @@ func (m *Engine) RejoinUserMessage(s *entity.MatchState, userId string) map[pb.O
 			}
 		}
 	}
-	if s.GetGameState() == pb.GameState_GameStateReward {
+	if s.GetGameState() == pb.GameState_GAME_STATE_REWARD {
 		messages[pb.OpCodeUpdate_OPCODE_UPDATE_WALLET] = s.GetBalanceResult()
 	}
 	return messages

@@ -5,8 +5,8 @@ import (
 	"database/sql"
 
 	"github.com/heroiclabs/nakama-common/runtime"
-	"github.com/nakamaFramework/blackjack-module/entity"
-	processor_interface "github.com/nakamaFramework/blackjack-module/usecase/processor"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	processor_interface "github.com/nk-nigeria/blackjack-module/usecase/processor"
 )
 
 const processorKey = "pd"

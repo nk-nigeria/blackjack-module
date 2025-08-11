@@ -5,9 +5,9 @@ import (
 	"math"
 	"strings"
 
-	"github.com/nakamaFramework/blackjack-module/entity"
-	"github.com/nakamaFramework/blackjack-module/pkg/packager"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/pkg/packager"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 )
 
 type StatePreparing struct {
@@ -49,7 +49,7 @@ func (s *StatePreparing) Enter(ctx context.Context, _ ...interface{}) error {
 		procPkg.GetLogger(),
 		procPkg.GetDispatcher(),
 		&pb.UpdateGameState{
-			State:     pb.GameState_GameStatePreparing,
+			State:     pb.GameState_GAME_STATE_PREPARING,
 			CountDown: int64(math.Round(float64(state.GetRemainCountDown()))),
 		},
 	)
@@ -97,7 +97,7 @@ func (s *StatePreparing) Process(ctx context.Context, args ...interface{}) error
 				procPkg.GetLogger(),
 				procPkg.GetDispatcher(),
 				&pb.UpdateGameState{
-					State:     pb.GameState_GameStatePreparing,
+					State:     pb.GameState_GAME_STATE_PREPARING,
 					CountDown: int64(remainCountDown),
 				},
 			)

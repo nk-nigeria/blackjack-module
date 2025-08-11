@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
-	"github.com/nakamaFramework/blackjack-module/api"
-	"github.com/nakamaFramework/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/api"
+	"github.com/nk-nigeria/blackjack-module/entity"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

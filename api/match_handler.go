@@ -5,13 +5,13 @@ import (
 	"database/sql"
 
 	"github.com/heroiclabs/nakama-common/runtime"
-	"github.com/nakamaFramework/blackjack-module/entity"
-	"github.com/nakamaFramework/blackjack-module/pkg/packager"
-	"github.com/nakamaFramework/blackjack-module/usecase/engine"
-	"github.com/nakamaFramework/blackjack-module/usecase/processor"
-	gsm "github.com/nakamaFramework/blackjack-module/usecase/state_machine"
-	smstates "github.com/nakamaFramework/blackjack-module/usecase/state_machine/sm_states"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/pkg/packager"
+	"github.com/nk-nigeria/blackjack-module/usecase/engine"
+	"github.com/nk-nigeria/blackjack-module/usecase/processor"
+	gsm "github.com/nk-nigeria/blackjack-module/usecase/state_machine"
+	smstates "github.com/nk-nigeria/blackjack-module/usecase/state_machine/sm_states"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 

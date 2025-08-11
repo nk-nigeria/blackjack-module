@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"github.com/nakamaFramework/blackjack-module/entity"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 	"google.golang.org/protobuf/proto"
 )
 

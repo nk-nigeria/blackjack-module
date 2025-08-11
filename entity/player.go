@@ -3,8 +3,8 @@ package entity
 import (
 	"strconv"
 
-	"github.com/nakamaFramework/cgp-common/bot"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/cgp-common/bot"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 )

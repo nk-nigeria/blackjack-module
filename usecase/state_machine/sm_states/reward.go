@@ -4,9 +4,9 @@ import (
 	"context"
 	"math"
 
-	"github.com/nakamaFramework/blackjack-module/entity"
-	"github.com/nakamaFramework/blackjack-module/pkg/packager"
-	pb "github.com/nakamaFramework/cgp-common/proto"
+	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/pkg/packager"
+	pb "github.com/nk-nigeria/cgp-common/proto"
 )
 
 type StateReward struct {
@@ -29,7 +29,7 @@ func (s *StateReward) Enter(ctx context.Context, _ ...interface{}) error {
 		procPkg.GetLogger(),
 		procPkg.GetDispatcher(),
 		&pb.UpdateGameState{
-			State:     pb.GameState_GameStateReward,
+			State:     pb.GameState_GAME_STATE_REWARD,
 			CountDown: int64(math.Round(state.GetRemainCountDown())),
 		},
 	)
