@@ -15,18 +15,17 @@ import (
 	"github.com/nk-nigeria/cgp-common/define"
 	"github.com/nk-nigeria/cgp-common/lib"
 	pb "github.com/nk-nigeria/cgp-common/proto"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type BaseProcessor struct {
 	engine      engine.UseCase
-	marshaler   *protojson.MarshalOptions
-	unmarshaler *protojson.UnmarshalOptions
+	marshaler   *proto.MarshalOptions
+	unmarshaler *proto.UnmarshalOptions
 }
 
-func NewBaseProcessor(marshaler *protojson.MarshalOptions, unmarshaler *protojson.UnmarshalOptions, engine engine.UseCase) *BaseProcessor {
+func NewBaseProcessor(marshaler *proto.MarshalOptions, unmarshaler *proto.UnmarshalOptions, engine engine.UseCase) *BaseProcessor {
 	return &BaseProcessor{
 		marshaler:   marshaler,
 		unmarshaler: unmarshaler,

@@ -7,14 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nk-nigeria/cgp-common/bot"
 	"github.com/nk-nigeria/cgp-common/lib"
 	pb "github.com/nk-nigeria/cgp-common/proto"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 	"github.com/nk-nigeria/blackjack-module/entity"
 	"github.com/nk-nigeria/blackjack-module/usecase/engine"
-	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 type Processor struct {
@@ -24,8 +23,8 @@ type Processor struct {
 }
 
 func NewMatchProcessor(
-	marshaler *protojson.MarshalOptions,
-	unmarshaler *protojson.UnmarshalOptions,
+	marshaler *proto.MarshalOptions,
+	unmarshaler *proto.UnmarshalOptions,
 	engine engine.UseCase,
 
 ) IProcessor {
@@ -44,18 +43,18 @@ func (p *Processor) ProcessNewGame(
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 ) {
-	if !p.emitBot {
-		p.emitBot = true
-		precenses := make([]runtime.Presence, 0)
-		for _, presence := range s.GetPresences() {
-			if bot.IsBot(presence.GetUserId()) {
-				precenses = append(precenses, presence)
-			}
-		}
-		if len(precenses) > 0 {
-			p.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, precenses)
-		}
-	}
+	// if !p.emitBot {
+	// 	p.emitBot = true
+	// 	precenses := make([]runtime.Presence, 0)
+	// 	for _, presence := range s.GetPresences() {
+	// 		if bot.IsBot(presence.GetUserId()) {
+	// 			precenses = append(precenses, presence)
+	// 		}
+	// 	}
+	// 	if len(precenses) > 0 {
+	// 		p.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, precenses)
+	// 	}
+	// }
 	p.engine.NewGame(s)
 	listPlayerId := make([]string, 0)
 	// deal
@@ -314,7 +313,7 @@ func (p *Processor) ProcessMessageFromUser(
 				continue
 			}
 			s.ResetUserNotInteract(message.GetUserId())
-			wallet, err := entity.ReadWalletUser(ctx, nk, logger, action.UserId)
+			wallet, err := entity.ReadWalletUser(ctx, nk, logger, message.GetUserId())
 			if err != nil {
 				logger.Error("error.read-wallet %v", err.Error())
 				continue
