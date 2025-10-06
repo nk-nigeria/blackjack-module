@@ -8,6 +8,8 @@ import (
 	"github.com/heroiclabs/nakama-common/runtime"
 	"github.com/nk-nigeria/blackjack-module/api"
 	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/cgp-common/bot"
+	"github.com/nk-nigeria/cgp-common/define"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,6 +25,9 @@ func InitModule(ctx context.Context, logger runtime.Logger, db *sql.DB, nk runti
 	}); err != nil {
 		return err
 	}
+
+	// Initialize BotLoader for blackjack
+	entity.BotLoader = bot.NewBotLoader(db, define.BlackjackName.String(), 100000)
 
 	logger.Info("Plugin loaded in '%d' msec.", time.Since(initStart).Milliseconds())
 	return nil

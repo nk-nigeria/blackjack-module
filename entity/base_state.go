@@ -3,6 +3,7 @@ package entity
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"math"
 	"time"
 
@@ -185,4 +186,64 @@ func (s *baseMatchState) UpdateLabel() {
 			UserSid:  player.Sid,
 		})
 	}
+}
+
+// AddBotToMatch adds bots to the match
+func (s *MatchState) AddBotToMatch(numBot int) []runtime.Presence {
+	var result []runtime.Presence
+
+	fmt.Printf("[DEBUG] AddBotToMatch called with numBot=%d\n", numBot)
+
+	// Get bots from BotLoader
+	if bots, err := BotLoader.GetFreeBot(numBot); err != nil {
+		fmt.Printf("[ERROR] Load bot failed: %s\n", err.Error())
+	} else {
+		fmt.Printf("[DEBUG] Successfully loaded %d bots from BotLoader\n", len(bots))
+		s.Bots = append(s.Bots, bots...)
+		for _, bot := range bots {
+			s.Presences.Put(bot.GetUserId(), bot) // bot is Presence
+			s.Label.NumBot += 1
+			result = append(result, bot) // append to return list
+			fmt.Printf("[DEBUG] Added bot %s to match\n", bot.GetUserId())
+		}
+	}
+	fmt.Printf("[DEBUG] AddBotToMatch completed, total bots added: %d\n", len(result))
+	return result
+}
+
+// RemoveBotFromMatch removes a bot from the match
+func (s *MatchState) RemoveBotFromMatch(botUserID string) (error, runtime.Presence) {
+	// Find the bot presence to remove
+	var botPresence runtime.Presence
+	s.Presences.Each(func(key interface{}, value interface{}) {
+		presence, ok := value.(runtime.Presence)
+		if ok && presence.GetUserId() == botUserID {
+			botPresence = presence
+		}
+	})
+
+	if botPresence == nil {
+		return fmt.Errorf("bot not found in match"), nil
+	}
+	for i, bot := range s.Bots {
+		if bot.GetUserId() == botUserID {
+			s.Bots = append(s.Bots[:i], s.Bots[i+1:]...)
+			BotLoader.FreeBot(botUserID)
+			break
+		}
+	}
+	// Remove bot from match
+	s.RemovePresences(botPresence)
+	s.Label.NumBot -= 1
+
+	return nil, botPresence
+}
+
+// GetBotPresences returns all bot presences in the match
+func (s *MatchState) GetBotPresences() []runtime.Presence {
+	botPresences := make([]runtime.Presence, 0)
+	for _, bot := range s.Bots {
+		botPresences = append(botPresences, bot)
+	}
+	return botPresences
 }

@@ -39,5 +39,21 @@ type IProcessor interface {
 		messages []runtime.MatchData,
 		s *entity.MatchState)
 
+	AddBotToMatch(ctx context.Context,
+		logger runtime.Logger,
+		nk runtime.NakamaModule,
+		db *sql.DB,
+		dispatcher runtime.MatchDispatcher,
+		s *entity.MatchState,
+		numBots int) error
+
+	RemoveBotFromMatch(ctx context.Context,
+		logger runtime.Logger,
+		nk runtime.NakamaModule,
+		db *sql.DB,
+		dispatcher runtime.MatchDispatcher,
+		s *entity.MatchState,
+		botUserID string) error
+
 	IBaseProcessor
 }

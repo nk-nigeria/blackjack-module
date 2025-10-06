@@ -24,7 +24,7 @@ func (s *StateMatching) Enter(ctx context.Context, _ ...interface{}) error {
 	state := procPkg.GetState()
 	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	procPkg.GetLogger().Info("apply leave presence")
-	listPrecense := state.GetPresenceNotInteract(1)
+	listPrecense := state.GetPresenceNotInteract(2)
 	if len(listPrecense) > 0 {
 		listUserId := make([]string, len(listPrecense))
 		for _, p := range listPrecense {

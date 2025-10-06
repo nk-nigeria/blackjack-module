@@ -3,6 +3,7 @@ package processor
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/nk-nigeria/cgp-common/define"
 	"github.com/nk-nigeria/cgp-common/lib"
 	pb "github.com/nk-nigeria/cgp-common/proto"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -295,4 +297,73 @@ func (m *BaseProcessor) report(
 			logger.Info("Report game (%s) operatio -> %s successful", s.Label.Name)
 		}
 	}
+}
+
+// AddBotToMatch adds bots to the current match
+func (p *Processor) AddBotToMatch(ctx context.Context,
+	logger runtime.Logger,
+	nk runtime.NakamaModule,
+	db *sql.DB,
+	dispatcher runtime.MatchDispatcher,
+	s *entity.MatchState,
+	numBots int) error {
+
+	logger.Info("Adding %d bots to match", numBots)
+
+	bJoin := s.AddBotToMatch(numBots)
+
+	if len(bJoin) > 0 {
+		listUserId := make([]string, 0, len(bJoin))
+		for _, p := range bJoin {
+			listUserId = append(listUserId, p.GetUserId())
+		}
+		p.emitNkEvent(ctx, define.NakEventMatchJoin, nk, s, listUserId...)
+		s.AddPlayingPresences(bJoin...)
+		p.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
+		matchJson, err := protojson.Marshal(s.Label)
+		if err != nil {
+			logger.Error("update json label failed ", err)
+			return nil
+		}
+		dispatcher.MatchLabelUpdate(string(matchJson))
+		return nil
+	}
+	return fmt.Errorf("no bot join")
+
+}
+
+// RemoveBotFromMatch removes a bot from the current match
+func (p *Processor) RemoveBotFromMatch(ctx context.Context,
+	logger runtime.Logger,
+	nk runtime.NakamaModule,
+	db *sql.DB,
+	dispatcher runtime.MatchDispatcher,
+	s *entity.MatchState,
+	botUserID string) error {
+
+	logger.Info("RemoveBotFromMatch %s", botUserID)
+	if botUserID == "" {
+		return nil
+	}
+
+	err, botPresence := s.RemoveBotFromMatch(botUserID)
+	if err != nil {
+		return err
+	}
+
+	// Emit leave event
+	p.emitNkEvent(ctx, define.NakEventMatchLeave, nk, s, botUserID)
+
+	s.AddLeavePresence(botPresence)
+
+	// Update match label
+	matchJson, err := protojson.Marshal(s.Label)
+	if err != nil {
+		logger.Error("update json label failed ", err)
+		return nil
+	}
+	dispatcher.MatchLabelUpdate(string(matchJson))
+
+	logger.Info("Bot %s removed from match", botUserID)
+	return nil
 }

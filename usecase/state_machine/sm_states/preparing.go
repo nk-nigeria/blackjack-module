@@ -27,7 +27,7 @@ func (s *StatePreparing) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg.GetLogger().Info("state %v", state.Presences)
 	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
 	// remove all user not interact 2 game conti
-	listPrecense := state.GetPresenceNotInteract(1)
+	listPrecense := state.GetPresenceNotInteract(2)
 	if len(listPrecense) > 0 {
 		listUserId := make([]string, len(listPrecense))
 		for _, p := range listPrecense {

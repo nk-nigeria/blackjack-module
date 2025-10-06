@@ -55,6 +55,7 @@ func (p *Processor) ProcessNewGame(
 	// 		p.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, precenses)
 	// 	}
 	// }
+	p.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 	p.engine.NewGame(s)
 	listPlayerId := make([]string, 0)
 	// deal

@@ -1,10 +1,15 @@
 package entity
 
 import (
+	"fmt"
+
 	"github.com/emirpasic/gods/maps/linkedhashmap"
 	"github.com/heroiclabs/nakama-common/runtime"
+	"github.com/nk-nigeria/cgp-common/bot"
 	pb "github.com/nk-nigeria/cgp-common/proto"
 )
+
+var BotLoader = bot.NewBotLoader(nil, "", 0)
 
 const (
 	MinPresences  = 1
@@ -30,10 +35,19 @@ type MatchState struct {
 	// gameState      pb.GameState
 	updateFinish *pb.BlackjackUpdateFinish
 	isGameEnded  bool
+
+	// Bot-related fields
+	Bots       []*bot.BotPresence
+	EmitBot    bool
+	MatchCount int
+	BotResults map[string]int // Create a map to store individual bot results
+
+	// Bot logic for intelligent betting decisions
+	BotLogic *BlackjackBotLogic
 }
 
 func NewMatchState(label *pb.Match) MatchState {
-	return MatchState{
+	m := MatchState{
 		baseMatchState: baseMatchState{
 			Label:               label,
 			MinPresences:        MinPresences,
@@ -53,7 +67,20 @@ func NewMatchState(label *pb.Match) MatchState {
 		// gameState:    pb.GameState_GameStateIdle,
 		updateFinish: nil,
 		isGameEnded:  false,
+		BotResults:   make(map[string]int, 0),
+		BotLogic:     NewBlackjackBotLogic(),
 	}
+	// Automatically add bot players
+	if bots, err := BotLoader.GetFreeBot(int(label.NumBot)); err != nil {
+		fmt.Printf("\r\n load bot failed %s  \r\n", err.Error())
+	} else {
+		m.Bots = bots
+	}
+	for _, bot := range m.Bots {
+		m.Presences.Put(bot.GetUserId(), bot)
+		m.Label.Size += 1
+	}
+	return m
 }
 
 func (s *MatchState) InitUserBet() {
