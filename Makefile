@@ -3,17 +3,11 @@ APP_NAME=blackjack_plugin.so
 APP_PATH=$(PWD)
 NAKAMA_VER=3.27.0
 
-update-submodule-dev:
-	git checkout develop && git pull
-	git submodule update --init
-	git submodule update --remote
-	cd ./cgp-common && git checkout develop && git pull && cd ..
-	go get github.com/nk-nigeria/cgp-common@develop
-update-submodule-stg:
-	git checkout staging && git pull
-	git submodule update --init
-	git submodule update --remote
-	cd ./cgp-common && git checkout staging && cd ..
+GOPRIVATE="github.com/nk-nigeria/*"
+
+update-common:
+	go get github.com/nk-nigeria/cgp-common
+update-common-stg:
 	go get github.com/nk-nigeria/cgp-common@staging
 
 cpdev:
@@ -34,9 +28,9 @@ syncdev:
 
 bsync: build sync
 
-dev: update-submodule-dev build
+dev: update-common-dev build
 
-stg: update-submodule-stg build
+stg: update-common-stg build
 
 local: 
 	./sync_pkg_3.11.sh
