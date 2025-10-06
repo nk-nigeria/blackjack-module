@@ -1,7 +1,5 @@
 module github.com/nk-nigeria/blackjack-module
 
-replace github.com/nk-nigeria/cgp-common => ./cgp-common
-
 go 1.24.3
 
 require (
@@ -9,7 +7,7 @@ require (
 	github.com/emirpasic/gods v1.18.1
 	github.com/heroiclabs/nakama-common v1.37.0
 	github.com/jackc/pgtype v1.14.0
-	github.com/nk-nigeria/cgp-common v0.0.0-20250617081458-27c8725f03a9
+	github.com/nk-nigeria/cgp-common v0.0.0-20251006080151-9907e029331c
 	github.com/qmuntal/stateless v1.6.8
 	go.uber.org/zap v1.27.0
 	google.golang.org/grpc v1.72.0
