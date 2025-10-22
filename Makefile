@@ -6,9 +6,9 @@ NAKAMA_VER=3.27.0
 GOPRIVATE="github.com/nk-nigeria/*"
 
 update-common:
-	go get github.com/nk-nigeria/cgp-common
+	GOPROXY=direct go get github.com/nk-nigeria/cgp-common@main
 update-common-stg:
-	go get github.com/nk-nigeria/cgp-common@staging
+	GOPROXY=direct go get github.com/nk-nigeria/cgp-common@staging
 
 cpdev:
 	scp ./bin/${APP_NAME} nakama:/root/cgp-server-dev/dist/data/modules/
@@ -28,7 +28,7 @@ syncdev:
 
 bsync: build sync
 
-dev: update-common-dev build
+dev: update-common build
 
 stg: update-common-stg build
 

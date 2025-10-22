@@ -2,14 +2,27 @@ package entity
 
 import (
 	"fmt"
+	"math/rand"
 
 	"github.com/emirpasic/gods/maps/linkedhashmap"
 	"github.com/heroiclabs/nakama-common/runtime"
 	"github.com/nk-nigeria/cgp-common/bot"
 	pb "github.com/nk-nigeria/cgp-common/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 var BotLoader = bot.NewBotLoader(nil, "", 0)
+var marshaler = &proto.MarshalOptions{}
+
+// GetMarshaler returns the global marshaler
+func GetMarshaler() *proto.MarshalOptions {
+	return marshaler
+}
+
+// NewBotMatchData creates a new bot match data
+func NewBotMatchData(opCode pb.OpCodeRequest, data []byte, presence *bot.BotPresence) runtime.MatchData {
+	return bot.NewBotMatchData(opCode, data, presence)
+}
 
 const (
 	MinPresences  = 1
@@ -37,6 +50,7 @@ type MatchState struct {
 	isGameEnded  bool
 
 	// Bot-related fields
+	messages   []runtime.MatchData
 	Bots       []*bot.BotPresence
 	EmitBot    bool
 	MatchCount int
@@ -103,6 +117,24 @@ func (s *MatchState) Init() {
 		s.currentHand[presence.GetUserId()] = pb.BlackjackHandN0_BLACKJACK_HAND_1ST
 	}
 	s.isGameEnded = false
+}
+
+// InitTurnBot initializes bot turn for betting in preparing phase
+func (s *MatchState) InitTurnBot(botPresence *bot.BotPresence) {
+	// Reset bot logic for new game
+	if s.BotLogic != nil {
+		s.BotLogic.Reset()
+	}
+	preparingTimeout := GameStateDuration[pb.GameState_GAME_STATE_PREPARING].Seconds()
+	opt := bot.TurnOpt{
+		MaxOccur: bot.RandomInt(1, 3),                // Bot will bet 1-3 times during preparing
+		MinTick:  2 * TickRate,                       // Earliest: 1 second after preparing starts
+		MaxTick:  int(preparingTimeout-2) * TickRate, // Latest: 1 second before preparing ends
+	}
+
+	botPresence.InitTurnWithOption(opt, func() {
+		s.BotTurn(botPresence)
+	})
 }
 
 func (s *MatchState) InitVisited() {
@@ -496,4 +528,236 @@ func (s *MatchState) GetPlayersBet() []*pb.BlackjackPlayerBet {
 		})
 	}
 	return res
+}
+
+// Messages returns and clears the messages queue
+func (s *MatchState) Messages() []runtime.MatchData {
+	msgs := s.messages
+	s.messages = make([]runtime.MatchData, 0)
+	return msgs
+}
+
+// AddMessages adds messages to the queue
+func (s *MatchState) AddMessages(mgs ...runtime.MatchData) {
+	s.messages = append(s.messages, mgs...)
+}
+
+// BotLoop loops through all bots and calls their Loop method
+func (s *MatchState) BotLoop() {
+	for _, v := range s.Bots {
+		v.Loop()
+	}
+}
+
+// BotTurn handles bot betting decisions
+func (s *MatchState) BotTurn(v *bot.BotPresence) error {
+	s.ResetUserNotInteract(v.GetUserId())
+	userId := v.GetUserId()
+
+	fmt.Printf("[DEBUG] [BotTurn] Handle bot turn for user: %s\n", userId)
+
+	// Use intelligent bot logic for betting decisions
+	if s.BotLogic != nil {
+		// Set bot balance based on current game state
+		s.BotLogic.SetBalance(int64(s.Label.MarkUnit) * 100) // Assume 100x base unit
+
+		// Generate intelligent bet using bot logic
+		botBet := s.BotLogic.GenerateBotBet()
+		botBet.UserId = userId
+
+		if botBet.First <= 0 {
+			fmt.Printf("[DEBUG] [BotTurn] Bot %s generated 0 bet, skipping\n", userId)
+			return nil
+		}
+
+		fmt.Printf("[DEBUG] [BotTurn] Bot %s placing intelligent bet: %d chips\n", userId, botBet.First)
+
+		// Create bet message (convert BlackjackPlayerBet to BlackjackBet for opcode)
+		betMessage := &pb.BlackjackBet{
+			UserId: userId,
+			Chips:  botBet.First,
+			Code:   pb.BlackjackBetCode_BLACKJACK_BET_NORMAL,
+		}
+
+		// Marshal and send via message queue like a real user
+		buf, _ := marshaler.Marshal(betMessage)
+		data := bot.NewBotMatchData(
+			pb.OpCodeRequest_OPCODE_REQUEST_BET, buf, v,
+		)
+		s.AddMessages(data)
+
+		fmt.Printf("[DEBUG] [BotTurn] Bot %s bet message queued successfully\n", userId)
+		return nil
+	}
+
+	// Fallback to old random betting logic
+	fmt.Printf("[DEBUG] [BotTurn] Using fallback random betting for bot %s\n", userId)
+	betAmount := int64(s.Label.Bet.MarkUnit) * int64(rand.Intn(5)+1) // Random bet 1-5x base unit
+
+	bet := &pb.BlackjackBet{
+		UserId: userId,
+		Chips:  betAmount,
+		Code:   pb.BlackjackBetCode_BLACKJACK_BET_NORMAL,
+	}
+
+	// Marshal and send via message queue
+	buf, _ := marshaler.Marshal(bet)
+	data := bot.NewBotMatchData(
+		pb.OpCodeRequest_OPCODE_REQUEST_BET, buf, v,
+	)
+	s.AddMessages(data)
+
+	fmt.Printf("[DEBUG] [BotTurn] Bot %s placed fallback bet: %d chips via message queue\n", userId, betAmount)
+	return nil
+}
+
+// HasInsuranceBet checks if user has already placed insurance bet
+func (s *MatchState) HasInsuranceBet(userId string) bool {
+	if bet, found := s.userBets[userId]; found {
+		return bet.Insurance > 0
+	}
+	return false
+}
+
+// BotInsuranceAction handles bot insurance decision and sends via message queue
+func (s *MatchState) BotInsuranceAction(v *bot.BotPresence) error {
+	userId := v.GetUserId()
+
+	fmt.Printf("[DEBUG] [BotInsuranceAction] Handle bot insurance for user: %s\n", userId)
+
+	// Get player hand
+	playerHand := s.GetPlayerPartOfHand(userId, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	if playerHand == nil {
+		fmt.Printf("[DEBUG] [BotInsuranceAction] Hand not found for user %s, skipping insurance\n", userId)
+		return nil
+	}
+
+	// Get dealer's up card
+	var dealerUpCard *pb.Card
+	if s.dealerHand != nil && len(s.dealerHand.first) > 0 {
+		dealerUpCard = s.dealerHand.first[0] // First card is face up
+	}
+
+	if dealerUpCard == nil || dealerUpCard.Rank != pb.CardRank_RANK_A {
+		fmt.Printf("[DEBUG] [BotInsuranceAction] Dealer doesn't have Ace, no insurance needed\n")
+		return nil
+	}
+
+	// Bot decides whether to take insurance
+	var shouldTakeInsurance bool
+	if s.BotLogic != nil {
+		shouldTakeInsurance = s.BotLogic.ShouldTakeInsurance(playerHand, dealerUpCard)
+		fmt.Printf("[DEBUG] [BotInsuranceAction] Bot %s intelligent insurance decision: %v\n", userId, shouldTakeInsurance)
+	} else {
+		// Fallback: random decision (30% chance)
+		shouldTakeInsurance = rand.Intn(100) < 30
+		fmt.Printf("[DEBUG] [BotInsuranceAction] Bot %s random insurance decision: %v\n", userId, shouldTakeInsurance)
+	}
+
+	if !shouldTakeInsurance {
+		fmt.Printf("[DEBUG] [BotInsuranceAction] Bot %s decided NOT to take insurance\n", userId)
+		return nil
+	}
+
+	// Create insurance action message
+	insuranceAction := &pb.BlackjackAction{
+		UserId: userId,
+		Code:   pb.BlackjackActionCode_BLACKJACK_ACTION_INSURANCE,
+	}
+
+	// Marshal and send via message queue
+	buf, _ := marshaler.Marshal(insuranceAction)
+	data := bot.NewBotMatchData(
+		pb.OpCodeRequest_OPCODE_REQUEST_DECLARE_CARDS, buf, v,
+	)
+	s.AddMessages(data)
+
+	fmt.Printf("[DEBUG] [BotInsuranceAction] Bot %s insurance action queued\n", userId)
+	return nil
+}
+
+// BotAction handles bot action decisions during game play and sends via message queue
+func (s *MatchState) BotAction(v *bot.BotPresence, legalActions []pb.BlackjackActionCode) error {
+	userId := v.GetUserId()
+
+	fmt.Printf("[DEBUG] [BotAction] Handle bot action for user: %s, legal actions: %v\n", userId, legalActions)
+
+	var action pb.BlackjackActionCode
+
+	// Use intelligent bot logic for action decisions
+	if s.BotLogic != nil {
+		// Get current player hand
+		playerHand := s.GetPlayerPartOfHand(userId, s.currentHand[userId])
+		if playerHand == nil {
+			fmt.Printf("[DEBUG] [BotAction] Hand not found for user %s, using fallback\n", userId)
+			// Use random action if hand not found
+			if len(legalActions) > 0 {
+				action = legalActions[rand.Intn(len(legalActions))]
+			} else {
+				action = pb.BlackjackActionCode_BLACKJACK_ACTION_STAY
+			}
+		} else {
+			// Get dealer's up card
+			var dealerUpCard *pb.Card
+			if s.dealerHand != nil && len(s.dealerHand.first) > 0 {
+				dealerUpCard = s.dealerHand.first[0] // First card is face up
+			}
+
+			// Decide action using bot logic
+			action = s.BotLogic.DecideGameAction(playerHand, dealerUpCard, legalActions)
+
+			fmt.Printf("[DEBUG] [BotAction] Bot %s intelligent action decision: %v\n", userId, action)
+		}
+	} else {
+		// Fallback to random action selection
+		fmt.Printf("[DEBUG] [BotAction] Using fallback random action for bot %s\n", userId)
+		if len(legalActions) > 0 {
+			action = legalActions[rand.Intn(len(legalActions))]
+		} else {
+			action = pb.BlackjackActionCode_BLACKJACK_ACTION_STAY
+		}
+	}
+
+	// Create action message
+	actionMessage := &pb.BlackjackAction{
+		UserId: userId,
+		Code:   action,
+	}
+
+	// Add action to history
+	if s.BotLogic != nil {
+		s.BotLogic.AddActionHistory(actionMessage)
+	}
+
+	// Marshal and send via message queue like a real user
+	buf, _ := marshaler.Marshal(actionMessage)
+	data := bot.NewBotMatchData(
+		pb.OpCodeRequest_OPCODE_REQUEST_DECLARE_CARDS, buf, v,
+	)
+	s.AddMessages(data)
+
+	fmt.Printf("[DEBUG] [BotAction] Bot %s action message queued: %v\n", userId, action)
+	return nil
+}
+
+// GetMatchID returns the match ID
+func (s *MatchState) GetMatchID() string {
+	return s.Label.MatchId
+}
+
+// GetBetAmount returns the bet amount
+func (s *MatchState) GetBetAmount() int64 {
+	return int64(s.Label.MarkUnit)
+}
+
+// GetLastResult returns the last game result (for bot decision making)
+func (s *MatchState) GetLastResult() int {
+	// For blackjack, we can use a simple result calculation
+	// This is a placeholder - you might want to implement more sophisticated logic
+	if s.isGameEnded && s.updateFinish != nil {
+		// Return a simple result based on game outcome
+		// 1 = player win, -1 = dealer win, 0 = tie
+		return 1 // Placeholder
+	}
+	return 0
 }

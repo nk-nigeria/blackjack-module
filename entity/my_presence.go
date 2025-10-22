@@ -17,11 +17,11 @@ type MyPrecense struct {
 
 // type ListMyPrecense []MyPrecense
 
-func NewMyPrecense(ctx context.Context, db *sql.DB, precense runtime.Presence) MyPrecense {
+func NewMyPrecense(ctx context.Context, nk runtime.NakamaModule, db *sql.DB, precense runtime.Presence) MyPrecense {
 	m := MyPrecense{
 		Presence: precense,
 	}
-	profiles, err := GetProfileUsers(ctx, db, precense.GetUserId())
+	profiles, err := GetProfileUsers(ctx, nk, precense.GetUserId())
 	if err != nil {
 		return m
 	}

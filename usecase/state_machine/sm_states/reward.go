@@ -5,7 +5,9 @@ import (
 	"math"
 
 	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/pkg/global"
 	"github.com/nk-nigeria/blackjack-module/pkg/packager"
+	"github.com/nk-nigeria/blackjack-module/usecase/service"
 	pb "github.com/nk-nigeria/cgp-common/proto"
 )
 
@@ -24,6 +26,31 @@ func (s *StateReward) Enter(ctx context.Context, _ ...interface{}) error {
 	// setup reward timeout
 	state := procPkg.GetState()
 	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
+
+	// Initialize bot integration if not already done
+	botIntegration := global.GetGlobalBotIntegration()
+	if botIntegration == nil {
+		botIntegration = service.NewBlackjackBotIntegration(procPkg.GetDb())
+		global.SetGlobalBotIntegration(botIntegration)
+	}
+
+	// Type assert to get the actual bot integration
+	if blackjackBotIntegration, ok := botIntegration.(*service.BlackjackBotIntegration); ok {
+		// Set match state for bot decision making
+		blackjackBotIntegration.SetMatchState(
+			state.GetMatchID(),
+			state.GetBetAmount(),
+			state.GetPresenceSize(),
+			state.GetLastResult(), // Use actual game result
+			1,                     // activeTables
+		)
+
+		// Process bot leave logic during reward phase
+		if err := blackjackBotIntegration.ProcessBotLeaveLogic(ctx); err != nil {
+			procPkg.GetLogger().Error("Failed to process bot leave logic: %v", err)
+		}
+	}
+
 	procPkg.GetProcessor().NotifyUpdateGameState(
 		state,
 		procPkg.GetLogger(),

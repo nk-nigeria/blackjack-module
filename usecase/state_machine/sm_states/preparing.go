@@ -6,7 +6,10 @@ import (
 	"strings"
 
 	"github.com/nk-nigeria/blackjack-module/entity"
+	"github.com/nk-nigeria/blackjack-module/pkg/global"
 	"github.com/nk-nigeria/blackjack-module/pkg/packager"
+	"github.com/nk-nigeria/blackjack-module/usecase/service"
+	"github.com/nk-nigeria/cgp-common/bot"
 	pb "github.com/nk-nigeria/cgp-common/proto"
 )
 
@@ -44,6 +47,31 @@ func (s *StatePreparing) Enter(ctx context.Context, _ ...interface{}) error {
 		procPkg.GetDispatcher(),
 		state,
 	)
+
+	// Initialize bot integration if not already done
+	botIntegration := global.GetGlobalBotIntegration()
+	if botIntegration == nil {
+		botIntegration = service.NewBlackjackBotIntegration(procPkg.GetDb())
+		global.SetGlobalBotIntegration(botIntegration)
+	}
+
+	// Type assert to get the actual bot integration
+	if blackjackBotIntegration, ok := botIntegration.(*service.BlackjackBotIntegration); ok {
+		// Set match state for bot decision making before processing bot logic
+		blackjackBotIntegration.SetMatchState(
+			state.GetMatchID(),
+			state.GetBetAmount(),
+			state.GetPresenceSize(),
+			0, // lastResult - chưa có kết quả game
+			1, // activeTables
+		)
+
+		// Process bot join logic during preparing phase
+		if err := blackjackBotIntegration.ProcessJoinBotLogic(ctx); err != nil {
+			procPkg.GetLogger().Error("Failed to process bot join logic: %v", err)
+		}
+	}
+
 	procPkg.GetProcessor().NotifyUpdateGameState(
 		state,
 		procPkg.GetLogger(),
@@ -56,6 +84,16 @@ func (s *StatePreparing) Enter(ctx context.Context, _ ...interface{}) error {
 	for _, precense := range state.GetPresences() {
 		state.PresencesNoInteract[precense.GetUserId()]++
 	}
+
+	// Initialize bot betting turns for all bots
+	procPkg.GetLogger().Info("[preparing] Initializing bot betting turns")
+	for _, presence := range state.GetBotPresences() {
+		if botPresence, ok := presence.(*bot.BotPresence); ok {
+			procPkg.GetLogger().Info("[preparing] Setting up bot turn for: %s", botPresence.GetUserId())
+			state.InitTurnBot(botPresence)
+		}
+	}
+
 	return nil
 }
 
@@ -71,7 +109,16 @@ func (s *StatePreparing) Process(ctx context.Context, args ...interface{}) error
 		s.Trigger(ctx, TriggerStateFinishFailed)
 		return nil
 	}
+	// Get messages from real users
 	message := procPkg.GetMessages()
+
+	// Process bot loops (triggers scheduled bot turns)
+	state.BotLoop()
+
+	// Get bot messages from queue and merge with user messages
+	botMessages := state.Messages()
+	message = append(message, botMessages...)
+
 	if len(message) > 0 {
 		procPkg.GetProcessor().ProcessMessageFromUser(ctx,
 			procPkg.GetLogger(),
@@ -80,6 +127,31 @@ func (s *StatePreparing) Process(ctx context.Context, args ...interface{}) error
 			procPkg.GetDispatcher(),
 			message, procPkg.GetState())
 	}
+
+	// Check if bot should join based on time (similar to Baccarat module)
+	if state.GetPresenceSize() < entity.MaxPresences {
+		// Check if bot should join based on time
+		botCtx := packager.GetContextWithProcessorPackager(procPkg)
+		if blackjackBotIntegration, ok := global.GetGlobalBotIntegration().(*service.BlackjackBotIntegration); ok {
+			joined, err := blackjackBotIntegration.CheckAndJoinExpiredBots(botCtx)
+			if err != nil {
+				procPkg.GetLogger().Error("[preparing] Bot join error: %v", err)
+			} else if joined {
+				procPkg.GetLogger().Info("[preparing] Bot joined based on time")
+				// Initialize betting turn for newly joined bots
+				for _, presence := range state.GetBotPresences() {
+					if botPresence, ok := presence.(*bot.BotPresence); ok {
+						if !state.IsBet(botPresence.GetUserId()) {
+							state.InitTurnBot(botPresence)
+						}
+					}
+				}
+			}
+		}
+	} else {
+		procPkg.GetLogger().Info("[preparing] Skip bot join - maximum players reached (%d)", entity.MaxPresences)
+	}
+
 	if remain <= 0 {
 		state.SetAllowBet(false)
 		if state.IsReadyToPlay() {

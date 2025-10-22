@@ -55,7 +55,7 @@ func (p *Processor) ProcessNewGame(
 	// 		p.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, precenses)
 	// 	}
 	// }
-	p.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
+	// p.notifyUserChange(ctx, nk, logger, db, dispatcher, s)
 	p.engine.NewGame(s)
 	listPlayerId := make([]string, 0)
 	// deal
@@ -64,19 +64,20 @@ func (p *Processor) ProcessNewGame(
 		listPlayerId = append(listPlayerId, presence.GetUserId())
 		s.AddCards(p.engine.Deal(2), presence.GetUserId(), pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 	}
-	for {
-		cards := p.engine.Deal(2)
-		hasRankA := false
-		if len(cards) > 1 && cards[0].Rank == pb.CardRank_RANK_A {
-			hasRankA = true
-		}
-		if !hasRankA {
-			continue
-		}
-		s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
-		break
-	}
-	// s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	// for {
+	// 	cards := p.engine.Deal(2)
+	// 	hasRankA := false
+	// 	if len(cards) > 1 && cards[0].Rank == pb.CardRank_RANK_A {
+	// 		hasRankA = true
+	// 	}
+	// 	if !hasRankA {
+	// 		continue
+	// 	}
+	// 	s.AddCards(cards, "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	// 	break
+	// }
+	s.AddCards(p.engine.Deal(2), "", pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+	p.notifyUserChange(ctx, nk, logger, db, dispatcher, s, nil)
 	p.notifyInitialDealCard(
 		ctx, nk, logger, dispatcher, s,
 	)
@@ -136,7 +137,7 @@ func (p *Processor) ProcessFinishGame(ctx context.Context,
 		ctx, nk, logger, db, dispatcher, s, updateFinish,
 	)
 	s.SetBalanceResult(balanceResult)
-	p.updateChipByResultGameFinish(ctx, nk, logger, balanceResult)
+	p.updateChipByResultGameFinish(ctx, nk, logger, db, balanceResult)
 	p.broadcastMessage(
 		logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_FINISH),
 		updateFinish, nil, nil, true,
@@ -279,7 +280,7 @@ func (p *Processor) ProcessMessageFromUser(
 				allow, enoughChip := s.IsCanDoubleBet(bet.UserId, wallet.Chips)
 				if allow {
 					chip := s.DoubleBet(bet.UserId)
-					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, bet.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+					p.notifyUpdateBet(ctx, nk, logger, db, dispatcher, s, bet.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 				} else if !enoughChip {
 					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, bet.UserId)
 				}
@@ -287,14 +288,14 @@ func (p *Processor) ProcessMessageFromUser(
 				allow, enoughChip := s.IsCanRebet(bet.UserId, wallet.Chips)
 				if allow {
 					chip := s.Rebet(bet.UserId)
-					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, bet.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+					p.notifyUpdateBet(ctx, nk, logger, db, dispatcher, s, bet.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 				} else if !enoughChip {
 					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, bet.UserId)
 				}
 			case pb.BlackjackBetCode_BLACKJACK_BET_NORMAL:
 				if s.IsCanBet(bet.UserId, wallet.Chips, bet) {
 					s.AddBet(bet)
-					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, bet.UserId, bet.Chips, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
+					p.notifyUpdateBet(ctx, nk, logger, db, dispatcher, s, bet.UserId, bet.Chips, pb.BlackjackHandN0_BLACKJACK_HAND_1ST)
 				} else {
 					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, bet.UserId)
 				}
@@ -330,7 +331,7 @@ func (p *Processor) ProcessMessageFromUser(
 					continue
 				}
 				chip := s.DoubleDownBet(action.UserId, s.GetCurrentHandN0(action.UserId))
-				p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
+				p.notifyUpdateBet(ctx, nk, logger, db, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
 				cards := p.engine.Deal(1)
 				s.AddCards(cards, action.UserId, s.GetCurrentHandN0(action.UserId))
 				p.broadcastMessage(
@@ -384,7 +385,7 @@ func (p *Processor) ProcessMessageFromUser(
 				}
 				if s.IsCanInsuranceBet(action.UserId, wallet.Chips) {
 					chip := s.InsuranceBet(action.UserId)
-					p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED) // unspecified mean its not in any of 2 hands slot -> insurance slot
+					p.notifyUpdateBet(ctx, nk, logger, db, dispatcher, s, action.UserId, chip, pb.BlackjackHandN0_BLACKJACK_HAND_UNSPECIFIED) // unspecified mean its not in any of 2 hands slot -> insurance slot
 				} else {
 					p.notifyNotEnoughChip(ctx, nk, logger, dispatcher, s, message.GetUserId())
 				}
@@ -410,7 +411,7 @@ func (p *Processor) ProcessMessageFromUser(
 					continue
 				}
 				chip := s.SplitHand(action.UserId)
-				p.notifyUpdateBet(ctx, nk, logger, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
+				p.notifyUpdateBet(ctx, nk, logger, db, dispatcher, s, action.UserId, chip, s.GetCurrentHandN0(action.UserId))
 				p.broadcastMessage(
 					logger, dispatcher, int64(pb.OpCodeUpdate_OPCODE_UPDATE_TABLE),
 					&pb.BlackjackUpdateDesk{
@@ -441,6 +442,51 @@ func (p *Processor) ProcessMessageFromUser(
 			}
 			for k, msg := range msgs {
 				p.broadcastMessage(logger, dispatcher, int64(k), msg, []runtime.Presence{s.GetPresence(message.GetUserId())}, nil, true)
+			}
+		case pb.OpCodeRequest_OPCODE_REQUEST_LEAVE_GAME:
+			userId := message.GetUserId()
+			presence := s.GetPresence(userId)
+			if presence == nil {
+				logger.WithField("user-id", userId).Error("presence not found for leave request")
+				continue
+			}
+
+			// Check if user has bet
+			hasBet := s.IsBet(userId)
+
+			if hasBet {
+				// User cannot leave, send error response
+				logger.WithField("user-id", userId).
+					WithField("game-state", s.GetGameState()).
+					WithField("has-bet", hasBet).
+					Info("user cannot leave table: has bet")
+
+				errorMsg := &pb.Error{
+					Code:      int64(pb.ErrorType_ERROR_TYPE_CANNOT_LEAVE_GAME),
+					Error:     "cannot_leave_table",
+					ErrorType: pb.ErrorType_ERROR_TYPE_CANNOT_LEAVE_GAME,
+				}
+
+				p.broadcastMessage(
+					logger, dispatcher,
+					int64(pb.OpCodeUpdate_OPCODE_ERROR),
+					errorMsg,
+					[]runtime.Presence{presence},
+					nil, true,
+				)
+			} else {
+				// User can leave, kick them from match
+				logger.WithField("user-id", userId).Info("user requested to leave table, kicking")
+
+				// Broadcast kick notification before kicking (like ProcessMatchKick does)
+				p.broadcastMessage(
+					logger, dispatcher,
+					int64(pb.OpCodeUpdate_OPCODE_KICK_OFF_THE_TABLE),
+					nil,
+					[]runtime.Presence{presence},
+					nil, true,
+				)
+				dispatcher.MatchKick([]runtime.Presence{presence})
 			}
 		}
 	}
@@ -524,6 +570,7 @@ func (p *Processor) notifyUpdateBet(
 	ctx context.Context,
 	nk runtime.NakamaModule,
 	logger runtime.Logger,
+	db *sql.DB,
 	dispatcher runtime.MatchDispatcher,
 	s *entity.MatchState,
 	userId string,
@@ -568,7 +615,7 @@ func (p *Processor) notifyUpdateBet(
 	if updateDesk.Error != nil {
 		return
 	}
-	p.updateChipByResultGameFinish(ctx, nk, logger, &pb.BalanceResult{Updates: []*pb.BalanceUpdate{balance}})
+	p.updateChipByResultGameFinish(ctx, nk, logger, db, &pb.BalanceResult{Updates: []*pb.BalanceUpdate{balance}})
 }
 
 func (p *Processor) notifyNotEnoughChip(
@@ -605,6 +652,7 @@ func (p *Processor) updateChipByResultGameFinish(
 	ctx context.Context,
 	nk runtime.NakamaModule,
 	logger runtime.Logger,
+	db *sql.DB,
 	balanceResult *pb.BalanceResult,
 ) {
 	walletUpdates := make([]*runtime.WalletUpdate, 0, len(balanceResult.Updates))
@@ -619,6 +667,16 @@ func (p *Processor) updateChipByResultGameFinish(
 			Changeset: changeset,
 			Metadata:  metadata,
 		})
+		// Add VIP farm accumulation for winning users
+		if amountChip > 0 {
+			if err := lib.AddUserVipFarmAccumulation(ctx, entity.DefaultMarshaler, entity.DefaulUnmarshaler, logger, db, nk, update.UserId, pb.VipFarmCumulativeType_VIP_FARM_CUMULATIVE_TYPE_BETTING, amountChip); err != nil {
+				logger.
+					WithField("user-id", update.UserId).
+					WithField("amount", amountChip).
+					WithField("error", err).
+					Error("error-add-vip-farm-accumulation")
+			}
+		}
 	}
 	if _, err := nk.WalletsUpdate(ctx, walletUpdates, true); err != nil {
 		payload, _ := json.Marshal(walletUpdates)

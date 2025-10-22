@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/heroiclabs/nakama-common/runtime"
 	"github.com/nk-nigeria/blackjack-module/entity"
@@ -61,7 +62,18 @@ func (m *MatchHandler) MatchJoin(ctx context.Context, logger runtime.Logger, db 
 	s := state.(*entity.MatchState)
 	logger.Info("match join, state=%v, presences=%v", s, presences)
 
+	// Check if in Matching state
+	isMatchingState := m.machine.GetPbState() == state_machine.StateMatching
+
 	m.processor.ProcessPresencesJoin(ctx, logger, nk, db, dispatcher, s, presences)
+
+	// Reset matching timeout if in Matching state and someone joined
+	if isMatchingState && len(presences) > 0 {
+		logger.Info("[matching] reset countdown due to presence join, count=%d", len(presences))
+		s.SetUpCountDown(5 * time.Second) // Reset lại matching timeout 5s
+	}
+
+	s.UpdateLabel()
 	labelJson, _ := entity.DefaultMarshaler.Marshal(s.Label)
 	dispatcher.MatchLabelUpdate(string(labelJson))
 	return s
@@ -76,7 +88,19 @@ func (m *MatchHandler) MatchLeave(ctx context.Context, logger runtime.Logger, db
 		m.processor.ProcessPresencesLeavePending(ctx, logger, nk, db, dispatcher, s, presences)
 		return s
 	}
+
+	// Check if in Matching state
+	isMatchingState := m.machine.GetPbState() == state_machine.StateMatching
+
 	m.processor.ProcessPresencesLeave(ctx, logger, nk, db, dispatcher, s, presences)
+
+	// Reset matching timeout if in Matching state and someone left
+	if isMatchingState && len(presences) > 0 {
+		logger.Info("[matching] reset countdown due to presence leave, count=%d", len(presences))
+		s.SetUpCountDown(5 * time.Second) // Reset lại matching timeout 5s
+	}
+
+	s.UpdateLabel()
 	labelJson, _ := entity.DefaultMarshaler.Marshal(s.Label)
 	dispatcher.MatchLabelUpdate(string(labelJson))
 	return s

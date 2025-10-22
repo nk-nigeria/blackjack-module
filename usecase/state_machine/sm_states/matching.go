@@ -3,8 +3,9 @@ package smstates
 import (
 	"context"
 	"strings"
+	"time"
 
-	"github.com/nk-nigeria/blackjack-module/entity"
+	// "github.com/nk-nigeria/blackjack-module/entity"
 	"github.com/nk-nigeria/blackjack-module/pkg/packager"
 )
 
@@ -22,7 +23,7 @@ func (s *StateMatching) Enter(ctx context.Context, _ ...interface{}) error {
 	procPkg := packager.GetProcessorPackagerFromContext(ctx)
 	procPkg.GetLogger().Info("[matching] enter")
 	state := procPkg.GetState()
-	state.SetUpCountDown(entity.GameStateDuration[state.GetGameState()])
+	state.SetUpCountDown(time.Second * 5)
 	procPkg.GetLogger().Info("apply leave presence")
 	listPrecense := state.GetPresenceNotInteract(2)
 	if len(listPrecense) > 0 {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/nk-nigeria/blackjack-module/entity"
 	"github.com/nk-nigeria/blackjack-module/pkg/packager"
+	"github.com/nk-nigeria/cgp-common/bot"
 	pb "github.com/nk-nigeria/cgp-common/proto"
 )
 
@@ -75,7 +76,50 @@ func (s *StatePlay) Process(ctx context.Context, args ...interface{}) error {
 		procPkg.GetState(),
 	)
 
+	// Get messages from real users
 	message := procPkg.GetMessages()
+
+	// Check if insurance round and trigger bot insurance decisions
+	if state.IsAllowInsurance() {
+		procPkg.GetLogger().Info("[play] Insurance round - checking bots")
+		// Insurance round - all bots decide simultaneously
+		for _, presence := range state.GetBotPresences() {
+			if botPresence, ok := presence.(*bot.BotPresence); ok {
+				userId := botPresence.GetUserId()
+				// Check if bot hasn't made insurance decision yet
+				if !state.HasInsuranceBet(userId) {
+					procPkg.GetLogger().Info("[play] Bot insurance check for: %s", userId)
+					// Bot decides whether to take insurance
+					state.BotInsuranceAction(botPresence)
+				}
+			}
+		}
+	}
+
+	// Check if current turn is a bot and trigger bot action
+	currentTurn := state.GetCurrentTurn()
+	if currentTurn != "" && state.IsAllowAction() {
+		// Check if current turn is a bot
+		for _, presence := range state.GetBotPresences() {
+			if botPresence, ok := presence.(*bot.BotPresence); ok && botPresence.GetUserId() == currentTurn {
+				// Current turn is a bot - trigger bot action
+				procPkg.GetLogger().Info("[play] Bot turn detected for: %s", currentTurn)
+
+				// Get legal actions for this bot
+				legalActions := state.GetLegalActions()
+				if len(legalActions) > 0 {
+					// Bot decides action and queues message
+					state.BotAction(botPresence, legalActions)
+				}
+				break
+			}
+		}
+	}
+
+	// Get bot messages from queue and merge with user messages
+	botMessages := state.Messages()
+	message = append(message, botMessages...)
+
 	if len(message) > 0 {
 		procPkg.GetProcessor().ProcessMessageFromUser(
 			procPkg.GetContext(),

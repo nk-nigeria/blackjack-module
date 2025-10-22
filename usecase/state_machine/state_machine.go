@@ -96,6 +96,7 @@ func (m *Machine) configure(stateMachineState lib.StateMachineState) {
 		state := procPkg.GetState()
 		state.SetGameState(t.Destination.(pb.GameState))
 		if procPkg.GetDispatcher() != nil {
+			state.UpdateLabel()
 			labelJson, _ := entity.DefaultMarshaler.Marshal(state.Label)
 			procPkg.GetDispatcher().MatchLabelUpdate(string(labelJson))
 		}

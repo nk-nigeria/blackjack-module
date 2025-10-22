@@ -73,12 +73,12 @@ func (s *baseMatchState) GetPresenceNotBotSize() int {
 	return count
 }
 
-func (s *baseMatchState) AddPresence(ctx context.Context,
+func (s *baseMatchState) AddPresence(ctx context.Context, nk runtime.NakamaModule,
 	db *sql.DB,
 	presences []runtime.Presence,
 ) {
 	for _, presence := range presences {
-		m := NewMyPrecense(ctx, db, presence)
+		m := NewMyPrecense(ctx, nk, db, presence)
 		s.Presences.Put(presence.GetUserId(), m)
 		s.ResetUserNotInteract(presence.GetUserId())
 	}

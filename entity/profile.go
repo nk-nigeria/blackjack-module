@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/heroiclabs/nakama-common/api"
+	"github.com/heroiclabs/nakama-common/runtime"
 	"github.com/jackc/pgtype"
 	pb "github.com/nk-nigeria/cgp-common/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -19,19 +20,18 @@ type Account struct {
 	Sid                int64
 }
 
-type ListProfile []*pb.Profile
+type ListProfile []*pb.SimpleProfile
 
-func (l ListProfile) ToMap() map[string]*pb.Profile {
-	mapProfile := make(map[string]*pb.Profile)
+func (l ListProfile) ToMap() map[string]*pb.SimpleProfile {
+	mapProfile := make(map[string]*pb.SimpleProfile)
 	for _, p := range l {
 		mapProfile[p.GetUserId()] = p
 	}
 	return mapProfile
 }
 
-func GetProfileUsers(ctx context.Context, db *sql.DB, userIDs ...string) (ListProfile, error) {
-	// accounts, err := nk.AccountsGetId(ctx, userIDs)
-	accounts, err := GetAccounts(ctx, db, userIDs...)
+func GetProfileUsers(ctx context.Context, nk runtime.NakamaModule, userIDs ...string) (ListProfile, error) {
+	accounts, err := nk.AccountsGetId(ctx, userIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -40,14 +40,13 @@ func GetProfileUsers(ctx context.Context, db *sql.DB, userIDs ...string) (ListPr
 		u := acc.GetUser()
 		var metadata map[string]interface{}
 		json.Unmarshal([]byte(u.GetMetadata()), &metadata)
-		profile := pb.Profile{
+		profile := pb.SimpleProfile{
 			UserId:      u.GetId(),
 			UserName:    u.GetUsername(),
 			DisplayName: u.GetDisplayName(),
 			Status:      InterfaceToString(metadata["status"]),
 			AvatarId:    InterfaceToString(metadata["avatar_id"]),
 			VipLevel:    ToInt64(metadata["vip_level"], 0),
-			UserSid:     acc.Sid,
 		}
 		playingMatchJson := InterfaceToString(metadata["playing_in_match"])
 
@@ -63,17 +62,27 @@ func GetProfileUsers(ctx context.Context, db *sql.DB, userIDs ...string) (ListPr
 				profile.AccountChip = wallet.Chips
 			}
 		}
-		profile.UserSid = acc.Sid
 		listProfile = append(listProfile, &profile)
 	}
 	return listProfile, nil
 }
 
-func ParseProfile(user *api.Account) *pb.Profile {
+func GetProfileUser(ctx context.Context, nk runtime.NakamaModule, userID string) (*pb.SimpleProfile, error) {
+	listProfile, err := GetProfileUsers(ctx, nk, userID)
+	if err != nil {
+		return nil, err
+	}
+	if len(listProfile) == 0 {
+		return nil, errors.New("profile not found")
+	}
+	return listProfile[0], nil
+}
+
+func ParseProfile(user *api.Account) *pb.SimpleProfile {
 	u := user.User
 	var metadata map[string]interface{}
 	json.Unmarshal([]byte(u.GetMetadata()), &metadata)
-	profile := &pb.Profile{
+	profile := &pb.SimpleProfile{
 		UserId:      u.GetId(),
 		UserName:    u.GetUsername(),
 		DisplayName: u.GetDisplayName(),
@@ -97,17 +106,6 @@ func ParseProfile(user *api.Account) *pb.Profile {
 		}
 	}
 	return profile
-}
-
-func GetProfileUser(ctx context.Context, db *sql.DB, userID string) (*pb.Profile, error) {
-	listProfile, err := GetProfileUsers(ctx, db, userID)
-	if err != nil {
-		return nil, err
-	}
-	if len(listProfile) == 0 {
-		return nil, errors.New("profile not found")
-	}
-	return listProfile[0], nil
 }
 
 func GetAccounts(ctx context.Context, db *sql.DB, userIds ...string) ([]*Account, error) {

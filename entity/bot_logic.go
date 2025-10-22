@@ -189,6 +189,16 @@ func (b *BlackjackBotLogic) GenerateBotBet() *pb.BlackjackPlayerBet {
 
 // DecideGameAction decides what action to take during the game
 func (b *BlackjackBotLogic) DecideGameAction(playerHand *pb.BlackjackHand, dealerUpCard *pb.Card, legalActions []pb.BlackjackActionCode) pb.BlackjackActionCode {
+	// Check for split first
+	if b.ShouldSplit(playerHand, dealerUpCard, legalActions) {
+		return pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT
+	}
+
+	// Check for double down
+	if b.ShouldDoubleDown(playerHand, dealerUpCard, legalActions) {
+		return pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE
+	}
+
 	// Basic strategy implementation
 	action := b.basicStrategy(playerHand, dealerUpCard, legalActions)
 
@@ -373,6 +383,147 @@ func (b *BlackjackBotLogic) wasLastBetLoss() bool {
 	// This would need to be implemented based on game results
 	// For now, we'll assume 50% chance of loss
 	return rand.Intn(2) == 0
+}
+
+// ShouldTakeInsurance determines if bot should take insurance
+func (b *BlackjackBotLogic) ShouldTakeInsurance(playerHand *pb.BlackjackHand, dealerUpCard *pb.Card) bool {
+	// Basic insurance strategy
+	// Take insurance if dealer shows Ace and player has 20 or blackjack
+	if dealerUpCard.Rank == pb.CardRank_RANK_A {
+		if playerHand.Point == 20 || playerHand.Point == 21 {
+			return true
+		}
+	}
+
+	// Add some randomness based on risk tolerance
+	if rand.Intn(100) < b.riskTolerance {
+		// Higher risk tolerance - more likely to take insurance
+		return rand.Intn(100) < 30 // 30% chance
+	}
+
+	return false
+}
+
+// ShouldSplit determines if bot should split cards
+func (b *BlackjackBotLogic) ShouldSplit(playerHand *pb.BlackjackHand, dealerUpCard *pb.Card, legalActions []pb.BlackjackActionCode) bool {
+	// Check if split is a legal action
+	if !b.containsAction(legalActions, pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT) {
+		return false
+	}
+
+	// Must have exactly 2 cards to split
+	if len(playerHand.Cards) != 2 {
+		return false
+	}
+
+	// Both cards must be the same rank
+	if playerHand.Cards[0].Rank != playerHand.Cards[1].Rank {
+		return false
+	}
+
+	dealerPoints := b.getCardValue(dealerUpCard)
+
+	// Basic splitting strategy
+	switch playerHand.Cards[0].Rank {
+	case pb.CardRank_RANK_A:
+		// Always split Aces
+		return true
+	case pb.CardRank_RANK_8:
+		// Always split 8s
+		return true
+	case pb.CardRank_RANK_10, pb.CardRank_RANK_J, pb.CardRank_RANK_Q, pb.CardRank_RANK_K:
+		// Never split 10s
+		return false
+	case pb.CardRank_RANK_9:
+		// Split 9s except against 7, 10, A
+		return dealerPoints != 7 && dealerPoints != 10 && dealerPoints != 11
+	case pb.CardRank_RANK_7:
+		// Split 7s against 2-7
+		return dealerPoints >= 2 && dealerPoints <= 7
+	case pb.CardRank_RANK_6:
+		// Split 6s against 2-6
+		return dealerPoints >= 2 && dealerPoints <= 6
+	case pb.CardRank_RANK_5:
+		// Never split 5s (treat as 10)
+		return false
+	case pb.CardRank_RANK_4:
+		// Split 4s only against 5 and 6
+		return dealerPoints == 5 || dealerPoints == 6
+	case pb.CardRank_RANK_3, pb.CardRank_RANK_2:
+		// Split 2s and 3s against 2-7
+		return dealerPoints >= 2 && dealerPoints <= 7
+	}
+
+	return false
+}
+
+// ShouldDoubleDown determines if bot should double down
+func (b *BlackjackBotLogic) ShouldDoubleDown(playerHand *pb.BlackjackHand, dealerUpCard *pb.Card, legalActions []pb.BlackjackActionCode) bool {
+	// Check if double down is a legal action
+	if !b.containsAction(legalActions, pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE) {
+		return false
+	}
+
+	// Must have exactly 2 cards to double down
+	if len(playerHand.Cards) != 2 {
+		return false
+	}
+
+	dealerPoints := b.getCardValue(dealerUpCard)
+	playerPoints := playerHand.Point
+
+	// Check if hand has Ace (soft total)
+	hasAce := false
+	for _, card := range playerHand.Cards {
+		if card.Rank == pb.CardRank_RANK_A {
+			hasAce = true
+			break
+		}
+	}
+
+	// Soft totals (with Ace)
+	if hasAce {
+		switch playerPoints {
+		case 20: // A,9
+			return false // Never double down on 20
+		case 19: // A,8
+			return false // Never double down on 19
+		case 18: // A,7
+			return dealerPoints >= 3 && dealerPoints <= 6
+		case 17: // A,6
+			return dealerPoints >= 3 && dealerPoints <= 6
+		case 16: // A,5
+			return dealerPoints >= 4 && dealerPoints <= 6
+		case 15: // A,4
+			return dealerPoints >= 4 && dealerPoints <= 6
+		case 14: // A,3
+			return dealerPoints >= 5 && dealerPoints <= 6
+		case 13: // A,2
+			return dealerPoints >= 5 && dealerPoints <= 6
+		}
+	} else {
+		// Hard totals
+		switch playerPoints {
+		case 11:
+			return true // Always double down on 11
+		case 10:
+			return dealerPoints >= 2 && dealerPoints <= 9
+		case 9:
+			return dealerPoints >= 3 && dealerPoints <= 6
+		case 8:
+			return false // Never double down on 8
+		case 7:
+			return false // Never double down on 7
+		case 6:
+			return false // Never double down on 6
+		case 5:
+			return false // Never double down on 5
+		case 4:
+			return false // Never double down on 4
+		}
+	}
+
+	return false
 }
 
 // updateBettingPatterns updates the betting pattern statistics

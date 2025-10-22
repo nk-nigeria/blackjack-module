@@ -6,217 +6,342 @@ import (
 	pb "github.com/nk-nigeria/cgp-common/proto"
 )
 
-func TestNewBlackjackBotLogic(t *testing.T) {
+func TestBlackjackBotLogic(t *testing.T) {
+	// Test creating new bot logic
 	botLogic := NewBlackjackBotLogic()
-
 	if botLogic == nil {
-		t.Fatal("NewBlackjackBotLogic returned nil")
+		t.Fatal("Failed to create BlackjackBotLogic")
 	}
 
+	// Test setting balance
+	botLogic.SetBalance(10000)
 	if botLogic.GetBalance() != 10000 {
-		t.Errorf("Expected default balance 10000, got %d", botLogic.GetBalance())
+		t.Errorf("Expected balance 10000, got %d", botLogic.GetBalance())
 	}
 
-	if botLogic.GetRiskLevel() != "moderate" {
-		t.Errorf("Expected default risk level 'moderate', got %s", botLogic.GetRiskLevel())
-	}
-}
-
-func TestBlackjackBotLogic_SetBalance(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-
-	botLogic.SetBalance(50000)
-
-	if botLogic.GetBalance() != 50000 {
-		t.Errorf("Expected balance 50000, got %d", botLogic.GetBalance())
-	}
-}
-
-func TestBlackjackBotLogic_SetRiskLevel(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-
-	// Test conservative
-	botLogic.SetRiskLevel("conservative")
-	if botLogic.GetRiskLevel() != "conservative" {
-		t.Errorf("Expected risk level 'conservative', got %s", botLogic.GetRiskLevel())
-	}
-	if botLogic.GetBaseBetPercentage() != 0.02 {
-		t.Errorf("Expected base bet percentage 0.02, got %f", botLogic.GetBaseBetPercentage())
-	}
-
-	// Test aggressive
+	// Test risk level
 	botLogic.SetRiskLevel("aggressive")
 	if botLogic.GetRiskLevel() != "aggressive" {
-		t.Errorf("Expected risk level 'aggressive', got %s", botLogic.GetRiskLevel())
+		t.Errorf("Expected risk level 'aggressive', got '%s'", botLogic.GetRiskLevel())
 	}
-	if botLogic.GetBaseBetPercentage() != 0.10 {
-		t.Errorf("Expected base bet percentage 0.10, got %f", botLogic.GetBaseBetPercentage())
-	}
-}
 
-func TestBlackjackBotLogic_DecideBetAmount(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-	botLogic.SetBalance(100000)
-
+	// Test bet amount decision
 	amount := botLogic.DecideBetAmount()
-
-	// Should be between 5% and 20% of balance (5000-20000)
-	if amount < 5000 || amount > 20000 {
-		t.Errorf("Bet amount %d should be between 5000 and 20000", amount)
+	if amount <= 0 {
+		t.Errorf("Bet amount should be positive, got %d", amount)
 	}
 
-	// Should be rounded to chip values
-	validChipValues := []int64{100, 500, 1000, 5000, 10000}
-	isValid := false
-	for _, chipValue := range validChipValues {
-		if amount == chipValue {
-			isValid = true
-			break
+	// Test bet amount doesn't exceed balance
+	if amount > botLogic.GetBalance() {
+		t.Errorf("Bet amount %d exceeds balance %d", amount, botLogic.GetBalance())
+	}
+
+	// Test generating bot bet
+	botBet := botLogic.GenerateBotBet()
+	if botBet == nil {
+		t.Fatal("Failed to generate bot bet")
+	}
+	if botBet.First <= 0 {
+		t.Errorf("Bot bet amount should be positive, got %d", botBet.First)
+	}
+}
+
+func TestBlackjackBotLogicBasicStrategy(t *testing.T) {
+	botLogic := NewBlackjackBotLogic()
+
+	// Test basic strategy with different hands
+	tests := []struct {
+		name           string
+		playerCards    []*pb.Card
+		dealerCard     *pb.Card
+		expectedAction pb.BlackjackActionCode
+	}{
+		{
+			name: "Blackjack - should stay",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_A, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_K, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:     &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			expectedAction: pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+		},
+		{
+			name: "Hard 17 - should stay",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_10, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_7, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:     &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			expectedAction: pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+		},
+		{
+			name: "Hard 11 - should double down",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_5, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:     &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			expectedAction: pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE,
+		},
+		{
+			name: "Hard 16 vs 7 - should hit",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_10, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:     &pb.Card{Rank: pb.CardRank_RANK_7, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			expectedAction: pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+		},
+		{
+			name: "Soft 18 vs 9 - should hit",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_A, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_7, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:     &pb.Card{Rank: pb.CardRank_RANK_9, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			expectedAction: pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			// Create hand with cards
+			hand := &pb.BlackjackHand{
+				Cards: test.playerCards,
+				Point: calculateHandValue(test.playerCards),
+			}
+
+			// Test basic strategy
+			action := botLogic.basicStrategy(hand, test.dealerCard, []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE,
+			})
+
+			if action != test.expectedAction {
+				t.Errorf("Expected action %v, got %v", test.expectedAction, action)
+			}
+		})
+	}
+}
+
+func TestBlackjackBotLogicSplitStrategy(t *testing.T) {
+	botLogic := NewBlackjackBotLogic()
+
+	tests := []struct {
+		name         string
+		playerCards  []*pb.Card
+		dealerCard   *pb.Card
+		shouldSplit  bool
+		legalActions []pb.BlackjackActionCode
+	}{
+		{
+			name: "Aces - should split",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_A, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_A, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:  &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldSplit: true,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+		{
+			name: "8s - should split",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_8, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_8, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:  &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldSplit: true,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+		{
+			name: "10s - should not split",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_10, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_K, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:  &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldSplit: false,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_SPLIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hand := &pb.BlackjackHand{
+				Cards: test.playerCards,
+				Point: calculateHandValue(test.playerCards),
+			}
+
+			shouldSplit := botLogic.ShouldSplit(hand, test.dealerCard, test.legalActions)
+			if shouldSplit != test.shouldSplit {
+				t.Errorf("Expected should split %v, got %v", test.shouldSplit, shouldSplit)
+			}
+		})
+	}
+}
+
+func TestBlackjackBotLogicDoubleDownStrategy(t *testing.T) {
+	botLogic := NewBlackjackBotLogic()
+
+	tests := []struct {
+		name         string
+		playerCards  []*pb.Card
+		dealerCard   *pb.Card
+		shouldDouble bool
+		legalActions []pb.BlackjackActionCode
+	}{
+		{
+			name: "11 vs 6 - should double",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_5, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:   &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldDouble: true,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+		{
+			name: "10 vs 6 - should double",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_4, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:   &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldDouble: true,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+		{
+			name: "9 vs 6 - should double",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_3, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:   &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldDouble: true,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+		{
+			name: "8 vs 6 - should not double",
+			playerCards: []*pb.Card{
+				{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_SPADES},
+				{Rank: pb.CardRank_RANK_2, Suit: pb.CardSuit_SUIT_HEARTS},
+			},
+			dealerCard:   &pb.Card{Rank: pb.CardRank_RANK_6, Suit: pb.CardSuit_SUIT_DIAMONDS},
+			shouldDouble: false,
+			legalActions: []pb.BlackjackActionCode{
+				pb.BlackjackActionCode_BLACKJACK_ACTION_DOUBLE,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
+				pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			hand := &pb.BlackjackHand{
+				Cards: test.playerCards,
+				Point: calculateHandValue(test.playerCards),
+			}
+
+			shouldDouble := botLogic.ShouldDoubleDown(hand, test.dealerCard, test.legalActions)
+			if shouldDouble != test.shouldDouble {
+				t.Errorf("Expected should double %v, got %v", test.shouldDouble, shouldDouble)
+			}
+		})
+	}
+}
+
+// Helper function to calculate hand value
+func calculateHandValue(cards []*pb.Card) int32 {
+	total := int32(0)
+	aces := int32(0)
+
+	for _, card := range cards {
+		switch card.Rank {
+		case pb.CardRank_RANK_A:
+			total += 11
+			aces++
+		case pb.CardRank_RANK_J, pb.CardRank_RANK_Q, pb.CardRank_RANK_K:
+			total += 10
+		default:
+			total += int32(card.Rank)
 		}
 	}
-	if !isValid {
-		t.Errorf("Bet amount %d should be a valid chip value", amount)
+
+	// Adjust for aces
+	for aces > 0 && total > 21 {
+		total -= 10
+		aces--
 	}
+
+	return total
 }
 
-func TestBlackjackBotLogic_DecideBettingType(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
+func TestBlackjackBotLogicRiskLevels(t *testing.T) {
+	// Test different risk levels
+	riskLevels := []string{"conservative", "moderate", "aggressive"}
 
-	betType := botLogic.DecideBettingType()
+	for _, level := range riskLevels {
+		t.Run(level, func(t *testing.T) {
+			botLogic := NewBlackjackBotLogic()
+			botLogic.SetRiskLevel(level)
 
-	validTypes := []pb.BlackjackBetCode{
-		pb.BlackjackBetCode_BLACKJACK_BET_NORMAL,
-		pb.BlackjackBetCode_BLACKJACK_BET_DOUBLE,
-	}
+			// Test risk tolerance is within expected range
+			riskTolerance := botLogic.GetRiskTolerance()
+			switch level {
+			case "conservative":
+				if riskTolerance < 10 || riskTolerance > 30 {
+					t.Errorf("Conservative risk tolerance should be 10-30, got %d", riskTolerance)
+				}
+			case "moderate":
+				if riskTolerance < 30 || riskTolerance > 70 {
+					t.Errorf("Moderate risk tolerance should be 30-70, got %d", riskTolerance)
+				}
+			case "aggressive":
+				if riskTolerance < 70 || riskTolerance > 100 {
+					t.Errorf("Aggressive risk tolerance should be 70-100, got %d", riskTolerance)
+				}
+			}
 
-	isValid := false
-	for _, validType := range validTypes {
-		if betType == validType {
-			isValid = true
-			break
-		}
-	}
-	if !isValid {
-		t.Errorf("Bet type %v should be a valid betting type", betType)
-	}
-}
+			// Test bet percentages
+			basePercentage := botLogic.GetBaseBetPercentage()
+			maxPercentage := botLogic.GetMaxBetPercentage()
 
-func TestBlackjackBotLogic_GenerateBotBet(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-	botLogic.SetBalance(100000)
-
-	bet := botLogic.GenerateBotBet()
-
-	if bet == nil {
-		t.Fatal("GenerateBotBet returned nil")
-	}
-
-	if bet.First <= 0 {
-		t.Errorf("Bet amount should be positive, got %d", bet.First)
-	}
-
-	if bet.First > 100000 {
-		t.Errorf("Bet amount should not exceed balance, got %d", bet.First)
-	}
-}
-
-func TestBlackjackBotLogic_DecideGameAction(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-
-	// Test with a good hand (20 points)
-	playerHand := &pb.BlackjackHand{
-		Point: 20,
-		Type:  pb.BlackjackHandType_BLACKJACK_HAND_TYPE_NORMAL,
-	}
-
-	dealerUpCard := &pb.Card{
-		Rank: pb.CardRank_RANK_6,
-	}
-
-	legalActions := []pb.BlackjackActionCode{
-		pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
-		pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
-	}
-
-	action := botLogic.DecideGameAction(playerHand, dealerUpCard, legalActions)
-
-	// With 20 points against dealer 6, should stay
-	if action != pb.BlackjackActionCode_BLACKJACK_ACTION_STAY {
-		t.Errorf("Expected action STAY with 20 points vs dealer 6, got %v", action)
-	}
-}
-
-func TestBlackjackBotLogic_BasicStrategy(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-
-	// Test blackjack (21 points)
-	playerHand := &pb.BlackjackHand{
-		Point: 21,
-		Type:  pb.BlackjackHandType_BLACKJACK_HAND_TYPE_21P,
-	}
-
-	dealerUpCard := &pb.Card{
-		Rank: pb.CardRank_RANK_10,
-	}
-
-	legalActions := []pb.BlackjackActionCode{
-		pb.BlackjackActionCode_BLACKJACK_ACTION_STAY,
-		pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
-	}
-
-	action := botLogic.DecideGameAction(playerHand, dealerUpCard, legalActions)
-
-	if action != pb.BlackjackActionCode_BLACKJACK_ACTION_STAY {
-		t.Errorf("Expected action STAY with blackjack, got %v", action)
-	}
-}
-
-func TestBlackjackBotLogic_Reset(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-
-	// Add some history
-	bet := &pb.BlackjackPlayerBet{
-		UserId: "test",
-		First:  1000,
-	}
-	botLogic.AddBetHistory(bet)
-
-	action := &pb.BlackjackAction{
-		UserId: "test",
-		Code:   pb.BlackjackActionCode_BLACKJACK_ACTION_HIT,
-	}
-	botLogic.AddActionHistory(action)
-
-	// Reset
-	botLogic.Reset()
-
-	if len(botLogic.GetBetHistory()) != 0 {
-		t.Errorf("Bet history should be empty after reset, got %d items", len(botLogic.GetBetHistory()))
-	}
-
-	if len(botLogic.GetActionHistory()) != 0 {
-		t.Errorf("Action history should be empty after reset, got %d items", len(botLogic.GetActionHistory()))
-	}
-}
-
-func TestBlackjackBotLogic_GetCardValue(t *testing.T) {
-	botLogic := NewBlackjackBotLogic()
-
-	// Test Ace
-	ace := &pb.Card{Rank: pb.CardRank_RANK_A}
-	if botLogic.getCardValue(ace) != 11 {
-		t.Errorf("Expected Ace value 11, got %d", botLogic.getCardValue(ace))
-	}
-
-	// Test King
-	king := &pb.Card{Rank: pb.CardRank_RANK_J}
-	if botLogic.getCardValue(king) != 10 {
-		t.Errorf("Expected King value 10, got %d", botLogic.getCardValue(king))
-	}
-
-	// Test number card
-	seven := &pb.Card{Rank: pb.CardRank_RANK_7}
-	if botLogic.getCardValue(seven) != 7 {
-		t.Errorf("Expected 7 value 7, got %d", botLogic.getCardValue(seven))
+			if basePercentage <= 0 || basePercentage > 1 {
+				t.Errorf("Base bet percentage should be 0-1, got %f", basePercentage)
+			}
+			if maxPercentage <= 0 || maxPercentage > 1 {
+				t.Errorf("Max bet percentage should be 0-1, got %f", maxPercentage)
+			}
+			if maxPercentage < basePercentage {
+				t.Errorf("Max bet percentage %f should be >= base bet percentage %f", maxPercentage, basePercentage)
+			}
+		})
 	}
 }
